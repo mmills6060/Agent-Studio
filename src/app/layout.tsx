@@ -3,7 +3,7 @@ import "./globals.css"
 
 export const metadata: Metadata = {
   title: "Agent Studio",
-  description: "A tldraw-powered canvas",
+  description: "A React Flow-powered canvas",
 }
 
 export default function RootLayout({
