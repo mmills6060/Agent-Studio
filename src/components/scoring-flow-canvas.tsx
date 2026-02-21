@@ -15,7 +15,7 @@ import {
   type Edge,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
-import { useCallback, useState } from "react"
+import { forwardRef, useCallback, useImperativeHandle, useState } from "react"
 import { Play, Copy, Check, Upload } from "lucide-react"
 import ScoringCustomNode from "@/components/scoring-custom-node"
 import AddNodeToolbar from "@/components/add-node-toolbar"
@@ -56,12 +56,26 @@ import {
 } from "@/lib/scoring-block-types"
 import { parseScoringPrompt } from "@/components/handlers/scoring-prompt-parser"
 
+interface ScoringFlowCanvasRef {
+  getState: () => { nodes: Node<ScoringNodeData>[]; edges: Edge[] }
+}
+
+interface ScoringFlowProps {
+  initialNodes?: Node<ScoringNodeData>[]
+  initialEdges?: Edge[]
+}
+
 const nodeTypes = { custom: ScoringCustomNode }
 
-function ScoringFlow() {
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node<ScoringNodeData>>([])
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
+const ScoringFlow = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
+  function ScoringFlow({ initialNodes, initialEdges }, ref) {
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node<ScoringNodeData>>(initialNodes ?? [])
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges ?? [])
   const { screenToFlowPosition, fitView } = useReactFlow()
+
+  useImperativeHandle(ref, () => ({
+    getState: () => ({ nodes: nodes as Node<ScoringNodeData>[], edges }),
+  }), [nodes, edges])
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [isEditorOpen, setIsEditorOpen] = useState(false)
@@ -406,14 +420,24 @@ function ScoringFlow() {
       </Dialog>
     </>
   )
-}
+},
+)
 
-export default function ScoringFlowCanvas() {
-  return (
-    <div className="absolute inset-0">
-      <ReactFlowProvider>
-        <ScoringFlow />
-      </ReactFlowProvider>
-    </div>
-  )
-}
+const ScoringFlowCanvas = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
+  function ScoringFlowCanvas({ initialNodes, initialEdges }, ref) {
+    return (
+      <div className="absolute inset-0">
+        <ReactFlowProvider>
+          <ScoringFlow
+            ref={ref}
+            initialNodes={initialNodes}
+            initialEdges={initialEdges}
+          />
+        </ReactFlowProvider>
+      </div>
+    )
+  },
+)
+
+export default ScoringFlowCanvas
+export type { ScoringFlowCanvasRef, ScoringFlowProps }
