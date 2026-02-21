@@ -15,8 +15,9 @@ import {
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 import { useCallback, useState } from "react"
-import { Play, Copy, Check } from "lucide-react"
+import { Play, Copy, Check, Plus } from "lucide-react"
 import CustomNode from "@/components/custom-node"
+import SectionNode from "@/components/section-node"
 import AddNodeToolbar from "@/components/add-node-toolbar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -29,13 +30,14 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet"
 import {
-  createPromptBlock,
+  createTypedBlock,
   updateNodeData,
   generateSystemPrompt,
   type CustomNodeData,
 } from "@/components/handlers/flow-canvas-handlers"
+import { getBlockType } from "@/lib/block-types"
 
-const nodeTypes = { custom: CustomNode }
+const nodeTypes = { custom: CustomNode, section: SectionNode }
 
 function Flow() {
   const [nodes, setNodes, onNodesChange] = useNodesState([])
@@ -52,22 +54,47 @@ function Flow() {
     | Node<CustomNodeData>
     | undefined
 
+  const isQuestionBlock = selectedNode?.data.blockType === "question"
+  const isSectionBlock = selectedNode?.data.blockType === "section"
+
   const onConnect: OnConnect = useCallback(
     (connection) => setEdges((eds) => addEdge(connection, eds)),
     [setEdges],
   )
 
-  const handleAddBlock = useCallback(() => {
-    const position = screenToFlowPosition({
-      x: window.innerWidth / 2,
-      y: window.innerHeight / 2,
-    })
-    position.x += (Math.random() - 0.5) * 100
-    position.y += (Math.random() - 0.5) * 100
+  const handleAddBlock = useCallback(
+    (blockType: string) => {
+      const position = screenToFlowPosition({
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2,
+      })
+      position.x += (Math.random() - 0.5) * 100
+      position.y += (Math.random() - 0.5) * 100
 
-    const newNode = createPromptBlock(position)
-    setNodes((nds) => [...nds, newNode])
-  }, [screenToFlowPosition, setNodes])
+      const newNode = createTypedBlock(blockType, position)
+      setNodes((nds) => [...nds, newNode])
+    },
+    [screenToFlowPosition, setNodes],
+  )
+
+  const handleAddQuestion = useCallback(() => {
+    if (!selectedNodeId || !isSectionBlock) return
+
+    const parentNode = nodes.find((n) => n.id === selectedNodeId)
+    if (!parentNode) return
+
+    const existingChildren = nodes.filter(
+      (n) => n.parentId === selectedNodeId,
+    )
+    const yOffset = 50 + existingChildren.length * 90
+
+    const newQuestion = createTypedBlock(
+      "question",
+      { x: 20, y: yOffset },
+      selectedNodeId,
+    )
+    setNodes((nds) => [...nds, newQuestion])
+  }, [selectedNodeId, isSectionBlock, nodes, setNodes])
 
   const handleNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
@@ -107,6 +134,21 @@ function Flow() {
     [selectedNodeId, setNodes],
   )
 
+  const handleFollowUpChange = useCallback(
+    (value: string) => {
+      if (!selectedNodeId) return
+      setNodes(
+        (nds) =>
+          updateNodeData(
+            nds as Node<CustomNodeData>[],
+            selectedNodeId,
+            { followUpStrategy: value },
+          ),
+      )
+    },
+    [selectedNodeId, setNodes],
+  )
+
   const handleRun = useCallback(() => {
     const prompt = generateSystemPrompt(
       nodes as Node<CustomNodeData>[],
@@ -121,6 +163,13 @@ function Flow() {
     setIsCopied(true)
     setTimeout(() => setIsCopied(false), 2000)
   }, [generatedPrompt])
+
+  const blockConfig = selectedNode
+    ? getBlockType(selectedNode.data.blockType)
+    : null
+  const editorTitle = blockConfig
+    ? `Edit ${blockConfig.label} Block`
+    : "Edit Block"
 
   return (
     <>
@@ -149,16 +198,20 @@ function Flow() {
       <Sheet open={isEditorOpen} onOpenChange={setIsEditorOpen}>
         <SheetContent>
           <SheetHeader>
-            <SheetTitle>Edit Prompt Block</SheetTitle>
+            <SheetTitle>{editorTitle}</SheetTitle>
             <SheetDescription>
-              Set the title and content for this prompt block.
+              {isSectionBlock
+                ? "Configure this section and add questions to it."
+                : isQuestionBlock
+                  ? "Set the question text and follow-up strategy."
+                  : "Set the title and content for this block."}
             </SheetDescription>
           </SheetHeader>
           <div className="flex flex-col gap-4 px-4">
             <div className="flex flex-col gap-2">
               <label
                 htmlFor="node-label"
-                className="text-sm font-medium text-gray-900 dark:text-gray-100"
+                className="text-sm font-medium text-foreground"
               >
                 Title
               </label>
@@ -166,40 +219,91 @@ function Flow() {
                 id="node-label"
                 value={selectedNode?.data.label ?? ""}
                 onChange={(e) => handleLabelChange(e.target.value)}
-                placeholder="Prompt Block"
+                placeholder={blockConfig?.label ?? "Block Title"}
               />
             </div>
-            <div className="flex flex-col gap-2">
-              <label
-                htmlFor="node-content"
-                className="text-sm font-medium text-gray-900 dark:text-gray-100"
+
+            {isQuestionBlock ? (
+              <>
+                <div className="flex flex-col gap-2">
+                  <label
+                    htmlFor="node-question"
+                    className="text-sm font-medium text-foreground"
+                  >
+                    Question
+                  </label>
+                  <Textarea
+                    id="node-question"
+                    value={selectedNode?.data.content ?? ""}
+                    onChange={(e) => handleContentChange(e.target.value)}
+                    placeholder="Enter the question to ask..."
+                    className="min-h-[120px]"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label
+                    htmlFor="node-followup"
+                    className="text-sm font-medium text-foreground"
+                  >
+                    Follow-Up Strategy
+                  </label>
+                  <Textarea
+                    id="node-followup"
+                    value={selectedNode?.data.followUpStrategy ?? ""}
+                    onChange={(e) => handleFollowUpChange(e.target.value)}
+                    placeholder="Describe how to follow up based on the candidate's response..."
+                    className="min-h-[120px]"
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <label
+                  htmlFor="node-content"
+                  className="text-sm font-medium text-foreground"
+                >
+                  {isSectionBlock ? "System Instruction" : "Content"}
+                </label>
+                <Textarea
+                  id="node-content"
+                  value={selectedNode?.data.content ?? ""}
+                  onChange={(e) => handleContentChange(e.target.value)}
+                  placeholder={
+                    isSectionBlock
+                      ? "Enter a system instruction for this section..."
+                      : "Enter your prompt text here..."
+                  }
+                  className="min-h-[200px]"
+                />
+              </div>
+            )}
+
+            {isSectionBlock && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleAddQuestion}
+                className="gap-2 self-start"
               >
-                Content
-              </label>
-              <Textarea
-                id="node-content"
-                value={selectedNode?.data.content ?? ""}
-                onChange={(e) => handleContentChange(e.target.value)}
-                placeholder="Enter your prompt text here..."
-                className="min-h-[200px]"
-              />
-            </div>
+                <Plus className="size-4" />
+                Add Question
+              </Button>
+            )}
           </div>
         </SheetContent>
       </Sheet>
 
       <Sheet open={isOutputOpen} onOpenChange={setIsOutputOpen}>
-        <SheetContent>
-          <SheetHeader>
+        <SheetContent className="flex flex-col sm:max-w-2xl">
+          <SheetHeader className="shrink-0">
             <SheetTitle>Generated System Prompt</SheetTitle>
             <SheetDescription>
-              Your connected prompt blocks have been combined into a single
-              system prompt.
+              Your prompt blocks have been combined into a single system prompt.
             </SheetDescription>
           </SheetHeader>
-          <div className="flex flex-1 flex-col gap-4 overflow-hidden px-4">
-            <div className="flex-1 overflow-auto rounded-md border bg-gray-100 dark:bg-gray-800 p-4">
-              <pre className="whitespace-pre-wrap text-sm text-gray-900 dark:text-gray-100">
+          <div className="flex min-h-0 flex-1 flex-col gap-4 px-4">
+            <div className="min-h-0 flex-1 overflow-auto rounded-md border bg-muted p-4">
+              <pre className="whitespace-pre-wrap text-sm text-foreground">
                 {generatedPrompt ||
                   "No content to display. Add text to your prompt blocks and connect them."}
               </pre>
