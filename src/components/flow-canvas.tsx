@@ -15,7 +15,7 @@ import {
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 import { useCallback, useState } from "react"
-import { Play, Copy, Check, Plus } from "lucide-react"
+import { Play, Copy, Check, Plus, Upload } from "lucide-react"
 import CustomNode from "@/components/custom-node"
 import SectionNode from "@/components/section-node"
 import AddNodeToolbar from "@/components/add-node-toolbar"
@@ -30,11 +30,20 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet"
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import {
   createTypedBlock,
   updateNodeData,
   generateSystemPrompt,
   type CustomNodeData,
 } from "@/components/handlers/flow-canvas-handlers"
+import { handleImportPrompt } from "@/components/handlers/import-prompt-handlers"
 import { getBlockType } from "@/lib/block-types"
 
 const nodeTypes = { custom: CustomNode, section: SectionNode }
@@ -42,13 +51,15 @@ const nodeTypes = { custom: CustomNode, section: SectionNode }
 function Flow() {
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
-  const { screenToFlowPosition } = useReactFlow()
+  const { screenToFlowPosition, fitView } = useReactFlow()
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [isEditorOpen, setIsEditorOpen] = useState(false)
   const [isOutputOpen, setIsOutputOpen] = useState(false)
   const [generatedPrompt, setGeneratedPrompt] = useState("")
   const [isCopied, setIsCopied] = useState(false)
+  const [isImportOpen, setIsImportOpen] = useState(false)
+  const [importText, setImportText] = useState("")
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId) as
     | Node<CustomNodeData>
@@ -164,6 +175,16 @@ function Flow() {
     setTimeout(() => setIsCopied(false), 2000)
   }, [generatedPrompt])
 
+  const handleImport = useCallback(() => {
+    const { nodes: newNodes, edges: newEdges } = handleImportPrompt(importText)
+    if (newNodes.length === 0) return
+    setNodes(newNodes)
+    setEdges(newEdges)
+    setImportText("")
+    setIsImportOpen(false)
+    setTimeout(() => fitView({ padding: 0.2 }), 50)
+  }, [importText, setNodes, setEdges, fitView])
+
   const blockConfig = selectedNode
     ? getBlockType(selectedNode.data.blockType)
     : null
@@ -187,7 +208,16 @@ function Flow() {
         <Controls />
         <MiniMap />
         <AddNodeToolbar onAddBlock={handleAddBlock} />
-        <div className="absolute top-4 right-4 z-10">
+        <div className="absolute top-4 right-4 z-10 flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsImportOpen(true)}
+            className="gap-2 bg-background shadow-md"
+          >
+            <Upload className="size-4" />
+            Import
+          </Button>
           <Button size="sm" onClick={handleRun} className="gap-2 shadow-md">
             <Play className="size-4" />
             Run
@@ -325,6 +355,43 @@ function Flow() {
           </div>
         </SheetContent>
       </Sheet>
+
+      <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Import Prompt</DialogTitle>
+            <DialogDescription>
+              Paste a system prompt to parse it into flow blocks. This will
+              replace any existing nodes on the canvas.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={importText}
+            onChange={(e) => setImportText(e.target.value)}
+            placeholder="Paste your system prompt here..."
+            className="min-h-[200px] max-h-[50vh] overflow-y-auto font-mono text-sm resize-none"
+          />
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setImportText("")
+                setIsImportOpen(false)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleImport}
+              disabled={!importText.trim()}
+              className="gap-2"
+            >
+              <Upload className="size-4" />
+              Import
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

@@ -123,5 +123,23 @@ function getBlockType(id: string): BlockTypeConfig | undefined {
   return BLOCK_TYPES[id]
 }
 
-export { BLOCK_TYPES, TOP_LEVEL_BLOCK_TYPES, getBlockType }
+const tagToBlockTypeMap = new Map<string, BlockTypeConfig>(
+  Object.values(BLOCK_TYPES)
+    .filter((bt) => !bt.isChildOnly)
+    .map((bt) => [bt.tag, bt]),
+)
+
+function getBlockTypeByTag(rawTag: string): BlockTypeConfig | undefined {
+  const normalized = rawTag.trim().toUpperCase()
+
+  const exact = tagToBlockTypeMap.get(normalized)
+  if (exact) return exact
+
+  if (normalized.startsWith("[SECTION"))
+    return BLOCK_TYPES.section
+
+  return undefined
+}
+
+export { BLOCK_TYPES, TOP_LEVEL_BLOCK_TYPES, getBlockType, getBlockTypeByTag }
 export type { BlockTypeConfig }
