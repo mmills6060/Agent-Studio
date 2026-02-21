@@ -89,6 +89,8 @@ function generateSystemPrompt(
   const inDegree = new Map<string, number>()
   const adjacency = new Map<string, string[]>()
 
+  let orderedNodes: Node<CustomNodeData>[]
+
   if (edges.length > 0) {
     for (const edge of edges) {
       connectedNodes.add(edge.source)
@@ -121,15 +123,33 @@ function generateSystemPrompt(
       }
     }
 
-    return sorted
-      .map((id) => formatNodeOutput(nodeMap.get(id)!, childrenByParent))
-      .filter((text) => text.trim().length > 0)
-      .join("\n\n")
+    const sortedTopLevel = sorted
+      .map((id) => nodeMap.get(id)!)
+      .filter((n) => n && !n.parentId)
+
+    const sortedIds = new Set(sortedTopLevel.map((n) => n.id))
+    const disconnected = topLevelNodes
+      .filter((n) => !sortedIds.has(n.id))
+      .sort((a, b) => (a.position.y ?? 0) - (b.position.y ?? 0))
+
+    orderedNodes = [...disconnected, ...sortedTopLevel]
+  } else {
+    orderedNodes = [...topLevelNodes]
+      .sort((a, b) => (a.position.y ?? 0) - (b.position.y ?? 0))
   }
 
-  return topLevelNodes
-    .sort((a, b) => (a.position.y ?? 0) - (b.position.y ?? 0))
-    .map((node) => formatNodeOutput(node, childrenByParent))
+  const totalSections = orderedNodes.filter(
+    (n) => n.data.blockType === "section",
+  ).length
+  let sectionIndex = 0
+
+  return orderedNodes
+    .map((node) => {
+      const meta = node.data.blockType === "section"
+        ? { index: ++sectionIndex, total: totalSections }
+        : undefined
+      return formatNodeOutput(node, childrenByParent, meta)
+    })
     .filter((text) => text.trim().length > 0)
     .join("\n\n")
 }
@@ -137,6 +157,7 @@ function generateSystemPrompt(
 function formatNodeOutput(
   node: Node<CustomNodeData>,
   childrenByParent: Map<string, Node<CustomNodeData>[]>,
+  sectionMeta?: { index: number; total: number },
 ): string {
   const config = getBlockType(node.data.blockType)
   if (!config) return node.data.content ?? ""
@@ -145,7 +166,9 @@ function formatNodeOutput(
   const isSection = node.data.blockType === "section"
 
   if (isSection) {
-    const sectionHeader = `${tag.replace("]", `: ${node.data.label}]`)}`
+    const sectionHeader = sectionMeta
+      ? `[SECTION ${sectionMeta.index} OF ${sectionMeta.total}: ${node.data.label}]`
+      : `${tag.replace("]", `: ${node.data.label}]`)}`
     const children = childrenByParent.get(node.id) ?? []
     const systemInstruction = node.data.content?.trim()
 
