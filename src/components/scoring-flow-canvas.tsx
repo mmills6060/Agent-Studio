@@ -186,8 +186,8 @@ const ScoringFlow = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
       </ReactFlow>
 
       <Sheet open={isEditorOpen} onOpenChange={setIsEditorOpen}>
-        <SheetContent>
-          <SheetHeader>
+        <SheetContent className="flex flex-col">
+          <SheetHeader className="shrink-0">
             <SheetTitle>{editorTitle}</SheetTitle>
             <SheetDescription>
               {isAttribute
@@ -195,7 +195,8 @@ const ScoringFlow = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
                 : "Set the title and content for this block."}
             </SheetDescription>
           </SheetHeader>
-          <div className="flex flex-col gap-4 px-4">
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="flex flex-col gap-4 px-4">
             <div className="flex flex-col gap-2">
               <label
                 htmlFor="scoring-label"
@@ -327,6 +328,7 @@ const ScoringFlow = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
                 />
               </div>
             )}
+            </div>
           </div>
         </SheetContent>
       </Sheet>
