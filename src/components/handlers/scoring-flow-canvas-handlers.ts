@@ -1,6 +1,12 @@
 import type { Node, Edge } from "@xyflow/react"
 import { getScoringBlockType } from "@/lib/scoring-block-types"
 
+interface ScoreLevel {
+  value: number
+  description: string
+  examples: string[]
+}
+
 interface ScoringNodeData {
   label: string
   nodeType: string
@@ -11,6 +17,8 @@ interface ScoringNodeData {
   goal: string
   scoringRules: string
   examples: string
+  scoreLevels: ScoreLevel[]
+  attributeKey: string
   [key: string]: unknown
 }
 
@@ -38,6 +46,8 @@ function createScoringBlock(
       goal: "",
       scoringRules: "",
       examples: "",
+      scoreLevels: [],
+      attributeKey: "",
     },
   }
 }
@@ -108,18 +118,35 @@ function topologicalSort(
   return [...sorted, ...unconnected]
 }
 
+function formatScoreLevels(levels: ScoreLevel[]): string {
+  const sorted = [...levels].sort((a, b) => b.value - a.value)
+  return sorted
+    .map((level) => {
+      const lines = [`${level.value} = ${level.description}`]
+      for (const ex of level.examples) {
+        lines.push(`- "${ex}"`)
+      }
+      return lines.join("\n")
+    })
+    .join("\n")
+}
+
 function formatScoringAttribute(node: Node<ScoringNodeData>): string {
-  const { label, maxPoints, source, goal, scoringRules, examples } = node.data
+  const { label, maxPoints, source, goal, scoringRules, examples, scoreLevels } = node.data
   const parts: string[] = []
 
-  const header = `${label} \u2013 ${maxPoints} point${maxPoints !== 1 ? "s" : ""}${source ? ` (${source})` : ""}`
+  const header = `${label} – ${maxPoints} point${maxPoints !== 1 ? "s" : ""}${source ? ` (${source})` : ""}`
   parts.push(header)
 
-  if (goal.trim()) parts.push(`Goal: ${goal.trim()}`)
-  if (scoringRules.trim()) parts.push(scoringRules.trim())
-  if (examples.trim()) parts.push(`Examples (transcript):\n${examples.trim()}`)
+  if (scoreLevels.length > 0) {
+    parts.push(formatScoreLevels(scoreLevels))
+  } else {
+    if (goal.trim()) parts.push(`Goal: ${goal.trim()}`)
+    if (scoringRules.trim()) parts.push(scoringRules.trim())
+    if (examples.trim()) parts.push(`Examples (transcript):\n${examples.trim()}`)
+  }
 
-  return parts.join("\n\n")
+  return parts.join("\n")
 }
 
 function formatScoringNode(node: Node<ScoringNodeData>): string {
@@ -194,5 +221,50 @@ function generateScoringPrompt(
   return sections.join("\n\n")
 }
 
-export { createScoringBlock, updateScoringNodeData, generateScoringPrompt }
-export type { ScoringNodeData }
+function buildPossibleValuesString(levels: ScoreLevel[]): string {
+  const sorted = [...levels].sort((a, b) => a.value - b.value)
+  return sorted.map((l) => String(l.value)).join(" or ")
+}
+
+function replaceKeyInContent(
+  content: string,
+  oldKey: string,
+  newKey: string,
+  newValues: string,
+): string {
+  if (!oldKey && !newKey) return content
+  const keyToFind = oldKey || newKey
+  const escaped = keyToFind.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  const pattern = new RegExp(`"${escaped}"\\s*:\\s*<[^>]+>`, "g")
+  return content.replace(pattern, `"${newKey}": <${newValues}>`)
+}
+
+function syncAttributeToRelatedNodes(
+  nodes: Node<ScoringNodeData>[],
+  changedNodeId: string,
+  previousKey?: string,
+): Node<ScoringNodeData>[] {
+  const changedNode = nodes.find((n) => n.id === changedNodeId)
+  if (!changedNode || changedNode.data.blockType !== "scoring-attribute") return nodes
+  if (!changedNode.data.attributeKey) return nodes
+
+  const newKey = changedNode.data.attributeKey
+  const oldKey = previousKey ?? newKey
+  const levels = changedNode.data.scoreLevels
+  if (levels.length === 0) return nodes
+
+  const valuesStr = buildPossibleValuesString(levels)
+
+  return nodes.map((node) => {
+    if (node.data.blockType !== "scoring-instructions" && node.data.blockType !== "output-format")
+      return node
+    if (!node.data.content) return node
+
+    const updated = replaceKeyInContent(node.data.content, oldKey, newKey, valuesStr)
+    if (updated === node.data.content) return node
+    return { ...node, data: { ...node.data, content: updated } }
+  })
+}
+
+export { createScoringBlock, updateScoringNodeData, generateScoringPrompt, syncAttributeToRelatedNodes }
+export type { ScoringNodeData, ScoreLevel }

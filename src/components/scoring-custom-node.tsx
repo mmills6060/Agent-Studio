@@ -25,7 +25,13 @@ function ScoringCustomNode({ data }: NodeProps<ScoringCustomNodeType>) {
     ? accentColorMap[config.accentColor] ?? "border-l-chart-2"
     : "border-l-chart-2"
   const isAttribute = data.blockType === "scoring-attribute"
-  const preview = isAttribute ? data.goal?.trim() : data.content?.trim()
+  const scoreLevels = isAttribute ? (data.scoreLevels ?? []) : []
+  const hasScoreLevels = scoreLevels.length > 0
+  const preview = isAttribute
+    ? hasScoreLevels
+      ? scoreLevels.map((l) => String(l.value)).join(" / ")
+      : data.goal?.trim()
+    : data.content?.trim()
 
   return (
     <div
@@ -43,7 +49,7 @@ function ScoringCustomNode({ data }: NodeProps<ScoringCustomNodeType>) {
         </span>
       </div>
       {isAttribute && data.maxPoints > 0 && (
-        <div className="mt-1 flex items-center gap-1.5">
+        <div className="mt-1 flex flex-wrap items-center gap-1.5">
           <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
             {data.maxPoints} pt{data.maxPoints !== 1 ? "s" : ""}
           </span>
@@ -54,9 +60,14 @@ function ScoringCustomNode({ data }: NodeProps<ScoringCustomNodeType>) {
           )}
         </div>
       )}
+      {isAttribute && data.attributeKey && (
+        <p className="mt-1 truncate font-mono text-[10px] text-muted-foreground">
+          {data.attributeKey}
+        </p>
+      )}
       {preview && (
         <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">
-          {preview}
+          {hasScoreLevels ? `Levels: ${preview}` : preview}
         </p>
       )}
       <Handle

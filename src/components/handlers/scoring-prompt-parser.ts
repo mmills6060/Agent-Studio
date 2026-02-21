@@ -1,8 +1,8 @@
 import type { Node, Edge } from "@xyflow/react"
-import { createScoringBlock, type ScoringNodeData } from "./scoring-flow-canvas-handlers"
+import { createScoringBlock, type ScoringNodeData, type ScoreLevel } from "./scoring-flow-canvas-handlers"
 
 const ATTRIBUTE_HEADER_PATTERN =
-  /^(.+?)\s*[–—-]\s*(\d+)\s*points?\s*\(([^)]+)\)\s*$/
+  /^(.+?)\s*[–—-]\s*(\d+)\s*points?(?:\s*\(([^)]+)\))?\s*$/
 
 const SECTION_HEADERS = [
   { pattern: /^what this indicator assesses$/i, blockType: "indicator-overview" },
@@ -27,6 +27,42 @@ interface ParsedAttribute {
   goal: string
   scoringRules: string
   examples: string
+  scoreLevels: ScoreLevel[]
+}
+
+const SCORE_LEVEL_PATTERN = /^(\d+)\s*=\s*(.+)$/
+
+function parseScoreLevels(body: string): ScoreLevel[] {
+  const lines = body.split("\n")
+  const levels: ScoreLevel[] = []
+  let current: ScoreLevel | null = null
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+    const levelMatch = trimmed.match(SCORE_LEVEL_PATTERN)
+
+    if (levelMatch) {
+      if (current) levels.push(current)
+      current = {
+        value: parseInt(levelMatch[1], 10),
+        description: levelMatch[2].trim(),
+        examples: [],
+      }
+      continue
+    }
+
+    if (!current) continue
+
+    const bulletMatch = trimmed.match(/^-\s*"(.+)"$/)
+    if (bulletMatch) {
+      current.examples.push(bulletMatch[1])
+    } else if (trimmed.match(/^-\s+(.+)$/)) {
+      current.examples.push(trimmed.replace(/^-\s+/, ""))
+    }
+  }
+
+  if (current) levels.push(current)
+  return levels.sort((a, b) => b.value - a.value)
 }
 
 function detectSectionHeader(line: string): { blockType: string | null; label?: string } | null {
@@ -52,9 +88,11 @@ function parseAttributeBlock(text: string): ParsedAttribute | null {
 
   const name = headerMatch[1].trim()
   const maxPoints = parseInt(headerMatch[2], 10)
-  const source = headerMatch[3].trim()
+  const source = (headerMatch[3] ?? "").trim()
 
   const body = lines.slice(1).join("\n").trim()
+
+  const scoreLevels = parseScoreLevels(body)
 
   let goal = ""
   let scoringRules = ""
@@ -77,7 +115,7 @@ function parseAttributeBlock(text: string): ParsedAttribute | null {
     if (firstNewline !== -1) examples = examples.slice(firstNewline + 1).trim()
   }
 
-  return { name, maxPoints, source, goal, scoringRules, examples }
+  return { name, maxPoints, source, goal, scoringRules, examples, scoreLevels }
 }
 
 function splitAttributeBlocks(text: string): string[] {
@@ -96,6 +134,18 @@ function splitAttributeBlocks(text: string): string[] {
 
   if (currentBlock.length > 0) blocks.push(currentBlock.join("\n"))
   return blocks
+}
+
+const ATTRIBUTE_KEY_PATTERN = /"(\w+)":\s*<([^>]+)>/g
+
+function parseAttributeKeys(content: string): { key: string; possibleValues: string }[] {
+  const keys: { key: string; possibleValues: string }[] = []
+  let match: RegExpExecArray | null
+  while ((match = ATTRIBUTE_KEY_PATTERN.exec(content)) !== null) {
+    keys.push({ key: match[1], possibleValues: match[2] })
+  }
+  ATTRIBUTE_KEY_PATTERN.lastIndex = 0
+  return keys
 }
 
 function parseScoringPrompt(text: string): {
@@ -161,6 +211,7 @@ function parseScoringPrompt(text: string): {
           goal: parsed.goal,
           scoringRules: parsed.scoringRules,
           examples: parsed.examples,
+          scoreLevels: parsed.scoreLevels,
         })
       }
       continue
@@ -175,6 +226,24 @@ function parseScoringPrompt(text: string): {
     }
 
     addNode(section.blockType, { content })
+  }
+
+  const attributeNodes = allNodes.filter((n) => n.data.blockType === "scoring-attribute")
+  const instructionsNode = allNodes.find((n) => n.data.blockType === "scoring-instructions")
+  const outputNode = allNodes.find((n) => n.data.blockType === "output-format")
+
+  const instructionKeys = instructionsNode
+    ? parseAttributeKeys(instructionsNode.data.content)
+    : []
+  const outputKeys = outputNode
+    ? parseAttributeKeys(outputNode.data.content)
+    : []
+  const allKeys = instructionKeys.length > 0 ? instructionKeys : outputKeys
+
+  for (let i = 0; i < attributeNodes.length; i++) {
+    if (i < allKeys.length) {
+      attributeNodes[i].data.attributeKey = allKeys[i].key
+    }
   }
 
   const edges: Edge[] = []
