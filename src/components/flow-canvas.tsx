@@ -16,7 +16,7 @@ import {
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 import { forwardRef, useCallback, useImperativeHandle, useState } from "react"
-import { Play, Copy, Check, Plus, Upload } from "lucide-react"
+import { Play, Copy, Check, Plus, Upload, MessageSquare } from "lucide-react"
 import CustomNode from "@/components/custom-node"
 import SectionNode from "@/components/section-node"
 import AddNodeToolbar from "@/components/add-node-toolbar"
@@ -51,9 +51,16 @@ interface FlowCanvasRef {
   getPrompt: () => string
 }
 
+interface FlowProps {
+  onRunConversation?: () => void
+}
+
 const nodeTypes = { custom: CustomNode, section: SectionNode }
 
-const Flow = forwardRef<FlowCanvasRef>(function Flow(_props, ref) {
+const Flow = forwardRef<FlowCanvasRef, FlowProps>(function Flow(
+  { onRunConversation },
+  ref,
+) {
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
   const { screenToFlowPosition, fitView } = useReactFlow()
@@ -231,6 +238,17 @@ const Flow = forwardRef<FlowCanvasRef>(function Flow(_props, ref) {
             <Play className="size-4" />
             View prompt
           </Button>
+          {onRunConversation && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onRunConversation}
+              className="gap-2 bg-background shadow-md"
+            >
+              <MessageSquare className="size-4" />
+              Run Conversation
+            </Button>
+          )}
         </div>
       </ReactFlow>
 
@@ -405,11 +423,18 @@ const Flow = forwardRef<FlowCanvasRef>(function Flow(_props, ref) {
   )
 })
 
-const FlowCanvas = forwardRef<FlowCanvasRef>(function FlowCanvas(_props, ref) {
+interface FlowCanvasProps {
+  onRunConversation?: () => void
+}
+
+const FlowCanvas = forwardRef<FlowCanvasRef, FlowCanvasProps>(function FlowCanvas(
+  { onRunConversation },
+  ref,
+) {
   return (
     <div className="absolute inset-0">
       <ReactFlowProvider>
-        <Flow ref={ref} />
+        <Flow ref={ref} onRunConversation={onRunConversation} />
       </ReactFlowProvider>
     </div>
   )

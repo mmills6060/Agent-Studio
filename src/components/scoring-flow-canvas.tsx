@@ -16,7 +16,7 @@ import {
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 import { forwardRef, useCallback, useImperativeHandle, useState } from "react"
-import { Play, Copy, Check, Upload } from "lucide-react"
+import { Play, Copy, Check, Upload, BarChart3 } from "lucide-react"
 import ScoringCustomNode from "@/components/scoring-custom-node"
 import AddNodeToolbar from "@/components/add-node-toolbar"
 import { Button } from "@/components/ui/button"
@@ -63,12 +63,13 @@ interface ScoringFlowCanvasRef {
 interface ScoringFlowProps {
   initialNodes?: Node<ScoringNodeData>[]
   initialEdges?: Edge[]
+  onScoreConversation?: () => void
 }
 
 const nodeTypes = { custom: ScoringCustomNode }
 
 const ScoringFlow = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
-  function ScoringFlow({ initialNodes, initialEdges }, ref) {
+  function ScoringFlow({ initialNodes, initialEdges, onScoreConversation }, ref) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<ScoringNodeData>>(initialNodes ?? [])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges ?? [])
   const { screenToFlowPosition, fitView } = useReactFlow()
@@ -199,6 +200,17 @@ const ScoringFlow = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
             <Play className="size-4" />
             View prompt
           </Button>
+          {onScoreConversation && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onScoreConversation}
+              className="gap-2 bg-background shadow-md"
+            >
+              <BarChart3 className="size-4" />
+              Score Conversation
+            </Button>
+          )}
         </div>
       </ReactFlow>
 
@@ -424,7 +436,10 @@ const ScoringFlow = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
 )
 
 const ScoringFlowCanvas = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
-  function ScoringFlowCanvas({ initialNodes, initialEdges }, ref) {
+  function ScoringFlowCanvas(
+    { initialNodes, initialEdges, onScoreConversation },
+    ref,
+  ) {
     return (
       <div className="absolute inset-0">
         <ReactFlowProvider>
@@ -432,6 +447,7 @@ const ScoringFlowCanvas = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
             ref={ref}
             initialNodes={initialNodes}
             initialEdges={initialEdges}
+            onScoreConversation={onScoreConversation}
           />
         </ReactFlowProvider>
       </div>
