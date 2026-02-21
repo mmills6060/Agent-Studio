@@ -197,7 +197,7 @@ const ScoringFlow = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
           </Button>
           <Button size="sm" onClick={handleRun} className="gap-2 shadow-md">
             <Play className="size-4" />
-            Run
+            View prompt
           </Button>
         </div>
       </ReactFlow>
