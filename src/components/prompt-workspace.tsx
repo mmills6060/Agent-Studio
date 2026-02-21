@@ -28,6 +28,7 @@ const firstScoringTab = createScoringPromptTab()
 export default function PromptWorkspace() {
   const [activeTab, setActiveTab] = useState<string>("call-prompt")
   const [scoringTabs, setScoringTabs] = useState<ScoringPromptTab[]>([firstScoringTab])
+  const [currentScoringTabId, setCurrentScoringTabId] = useState(firstScoringTab.id)
   const [editingTabId, setEditingTabId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState("")
   const [isConversationOpen, setIsConversationOpen] = useState(false)
@@ -38,7 +39,7 @@ export default function PromptWorkspace() {
   const flowCanvasRef = useRef<FlowCanvasRef>(null)
 
   const isCallPrompt = activeTab === "call-prompt"
-  const activeScoringTab = scoringTabs.find((t) => t.id === activeTab)
+  const scoringTabToRender = scoringTabs.find((t) => t.id === currentScoringTabId) ?? scoringTabs[0]
 
   const saveCurrentCanvasState = useCallback(() => {
     if (!canvasRef.current || isCallPrompt) return
@@ -50,6 +51,7 @@ export default function PromptWorkspace() {
     (tabId: string) => {
       if (tabId === activeTab) return
       saveCurrentCanvasState()
+      if (tabId !== "call-prompt") setCurrentScoringTabId(tabId)
       setActiveTab(tabId)
     },
     [activeTab, saveCurrentCanvasState],
@@ -59,6 +61,7 @@ export default function PromptWorkspace() {
     saveCurrentCanvasState()
     const newTab = createScoringPromptTab()
     setScoringTabs((prev) => [...prev, newTab])
+    setCurrentScoringTabId(newTab.id)
     setActiveTab(newTab.id)
   }, [saveCurrentCanvasState])
 
@@ -68,13 +71,12 @@ export default function PromptWorkspace() {
       saveCurrentCanvasState()
       const updated = deleteScoringPromptTab(scoringTabs, tabId)
       setScoringTabs(updated)
-      if (activeTab === tabId) {
-        const deletedIndex = scoringTabs.findIndex((t) => t.id === tabId)
-        const nextTab = updated[Math.min(deletedIndex, updated.length - 1)]
-        setActiveTab(nextTab.id)
-      }
+      const deletedIndex = scoringTabs.findIndex((t) => t.id === tabId)
+      const nextTab = updated[Math.min(deletedIndex, updated.length - 1)]
+      if (activeTab === tabId) setActiveTab(nextTab.id)
+      if (currentScoringTabId === tabId) setCurrentScoringTabId(nextTab.id)
     },
-    [scoringTabs, activeTab, saveCurrentCanvasState],
+    [scoringTabs, activeTab, currentScoringTabId, saveCurrentCanvasState],
   )
 
   const handleStartRename = useCallback(
@@ -181,17 +183,17 @@ export default function PromptWorkspace() {
           </div>
         </header>
         <div className="relative flex-1">
-          {isCallPrompt && (
+          <div className={isCallPrompt ? "" : "hidden"}>
             <FlowCanvas ref={flowCanvasRef} />
-          )}
-          {activeScoringTab && (
+          </div>
+          <div className={isCallPrompt ? "hidden" : ""}>
             <ScoringFlowCanvas
-              key={activeScoringTab.id}
+              key={scoringTabToRender.id}
               ref={canvasRef}
-              initialNodes={activeScoringTab.nodes}
-              initialEdges={activeScoringTab.edges}
+              initialNodes={scoringTabToRender.nodes}
+              initialEdges={scoringTabToRender.edges}
             />
-          )}
+          </div>
         </div>
 
         <ConversationPanel

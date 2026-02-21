@@ -16,7 +16,7 @@ import {
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 import { forwardRef, useCallback, useImperativeHandle, useState } from "react"
-import { Copy, Check, Plus, Upload } from "lucide-react"
+import { Copy, Check, Plus, Upload, Loader2, Sparkles } from "lucide-react"
 import CustomNode from "@/components/custom-node"
 import SectionNode from "@/components/section-node"
 import { Button } from "@/components/ui/button"
@@ -44,6 +44,11 @@ import {
   type CustomNodeData,
 } from "@/components/handlers/flow-canvas-handlers"
 import { handleImportPrompt } from "@/components/handlers/import-prompt-handlers"
+import {
+  collectSectionContent,
+  generateScoringPromptFromSection,
+} from "@/components/handlers/scoring-prompt-generation-handlers"
+import { parseScoringPrompt } from "@/components/handlers/scoring-prompt-parser"
 import { getBlockType } from "@/lib/block-types"
 
 interface FlowCanvasRef {
@@ -53,10 +58,14 @@ interface FlowCanvasRef {
   addBlock: (blockType: string) => void
 }
 
+interface FlowCanvasProps {
+  onCreateScoringPrompt?: (nodes: Node[], edges: Edge[], tabName: string) => void
+}
+
 const nodeTypes = { custom: CustomNode, section: SectionNode }
 
-const Flow = forwardRef<FlowCanvasRef, object>(function Flow(
-  _props,
+const Flow = forwardRef<FlowCanvasRef, FlowCanvasProps>(function Flow(
+  props,
   ref,
 ) {
   const [nodes, setNodes, onNodesChange] = useNodesState([])
@@ -70,6 +79,7 @@ const Flow = forwardRef<FlowCanvasRef, object>(function Flow(
   const [isCopied, setIsCopied] = useState(false)
   const [isImportOpen, setIsImportOpen] = useState(false)
   const [importText, setImportText] = useState("")
+  const [isGeneratingScoring, setIsGeneratingScoring] = useState(false)
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId) as
     | Node<CustomNodeData>
@@ -104,10 +114,10 @@ const Flow = forwardRef<FlowCanvasRef, object>(function Flow(
     const parentNode = nodes.find((n) => n.id === selectedNodeId)
     if (!parentNode) return
 
-    const existingChildren = nodes.filter(
-      (n) => n.parentId === selectedNodeId,
-    )
-    const yOffset = 50 + existingChildren.length * 90
+    const existingChildren = nodes
+      .filter((n) => n.parentId === selectedNodeId)
+      .sort((a, b) => a.position.y - b.position.y)
+    const yOffset = 110 + existingChildren.length * 90
 
     const newQuestion = createTypedBlock(
       "question",
@@ -115,7 +125,42 @@ const Flow = forwardRef<FlowCanvasRef, object>(function Flow(
       selectedNodeId,
     )
     setNodes((nds) => [...nds, newQuestion])
-  }, [selectedNodeId, isSectionBlock, nodes, setNodes])
+
+    const lastChild = existingChildren[existingChildren.length - 1]
+    if (lastChild) {
+      setEdges((eds) =>
+        addEdge(
+          { source: lastChild.id, target: newQuestion.id },
+          eds,
+        ),
+      )
+    }
+  }, [selectedNodeId, isSectionBlock, nodes, setNodes, setEdges])
+
+  const handleCreateScoringPrompt = useCallback(async () => {
+    if (!selectedNodeId || !isSectionBlock || !props.onCreateScoringPrompt) return
+
+    const sectionContent = collectSectionContent(
+      nodes as Node<CustomNodeData>[],
+      selectedNodeId,
+    )
+    if (!sectionContent) return
+
+    setIsGeneratingScoring(true)
+    try {
+      const scoringText = await generateScoringPromptFromSection(sectionContent)
+      const { nodes: scoringNodes, edges: scoringEdges } = parseScoringPrompt(scoringText)
+      const sectionNode = nodes.find((n) => n.id === selectedNodeId)
+      const tabName = sectionNode?.data.label
+        ? `${(sectionNode.data as CustomNodeData).label} Scoring`
+        : "Generated Scoring"
+      props.onCreateScoringPrompt(scoringNodes, scoringEdges, tabName)
+    } catch (err) {
+      console.error("Failed to generate scoring prompt:", err)
+    } finally {
+      setIsGeneratingScoring(false)
+    }
+  }, [selectedNodeId, isSectionBlock, nodes, props])
 
   const handleNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
@@ -227,8 +272,8 @@ const Flow = forwardRef<FlowCanvasRef, object>(function Flow(
       </ReactFlow>
 
       <Sheet open={isEditorOpen} onOpenChange={setIsEditorOpen}>
-        <SheetContent>
-          <SheetHeader>
+        <SheetContent className="flex flex-col">
+          <SheetHeader className="shrink-0">
             <SheetTitle>{editorTitle}</SheetTitle>
             <SheetDescription>
               {isSectionBlock
@@ -238,6 +283,7 @@ const Flow = forwardRef<FlowCanvasRef, object>(function Flow(
                   : "Set the title and content for this block."}
             </SheetDescription>
           </SheetHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="flex flex-col gap-4 px-4">
             <div className="flex flex-col gap-2">
               <label
@@ -310,16 +356,32 @@ const Flow = forwardRef<FlowCanvasRef, object>(function Flow(
             )}
 
             {isSectionBlock && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleAddQuestion}
-                className="gap-2 self-start"
-              >
-                <Plus className="size-4" />
-                Add Question
-              </Button>
+              <div className="flex flex-col gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddQuestion}
+                  className="gap-2 self-start"
+                >
+                  <Plus className="size-4" />
+                  Add Question
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleCreateScoringPrompt}
+                  disabled={isGeneratingScoring || !props.onCreateScoringPrompt}
+                  className="gap-2 self-start"
+                >
+                  {isGeneratingScoring ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="size-4" />
+                  )}
+                  {isGeneratingScoring ? "Generating..." : "Create Scoring Prompt"}
+                </Button>
+              </div>
             )}
+          </div>
           </div>
         </SheetContent>
       </Sheet>
@@ -397,18 +459,18 @@ const Flow = forwardRef<FlowCanvasRef, object>(function Flow(
   )
 })
 
-const FlowCanvas = forwardRef<FlowCanvasRef, object>(function FlowCanvas(
-  _props,
+const FlowCanvas = forwardRef<FlowCanvasRef, FlowCanvasProps>(function FlowCanvas(
+  props,
   ref,
 ) {
   return (
     <div className="absolute inset-0">
       <ReactFlowProvider>
-        <Flow ref={ref} />
+        <Flow ref={ref} {...props} />
       </ReactFlowProvider>
     </div>
   )
 })
 
 export default FlowCanvas
-export type { FlowCanvasRef }
+export type { FlowCanvasRef, FlowCanvasProps }

@@ -26,10 +26,10 @@ const LAYOUT = {
   simpleBlockWidth: 220,
   sectionWidth: 460,
   horizontalGap: 80,
-  sectionBaseHeight: 200,
+  sectionBaseHeight: 260,
   questionHeight: 90,
-  questionYStart: 50,
-  minSectionHeight: 340,
+  questionYStart: 110,
+  minSectionHeight: 400,
 } as const
 
 function splitIntoTopLevelBlocks(text: string): ParsedBlock[] {
@@ -115,6 +115,7 @@ function parsePromptToFlow(text: string): {
   if (blocks.length === 0) return { nodes: [], edges: [] }
 
   const allNodes: Node<CustomNodeData>[] = []
+  const edges: Edge[] = []
   const topLevelIds: string[] = []
   let currentX = LAYOUT.baseX
 
@@ -139,6 +140,7 @@ function parsePromptToFlow(text: string): {
       allNodes.push(sectionNode)
       topLevelIds.push(sectionNode.id)
 
+      const questionIds: string[] = []
       for (let qi = 0; qi < questions.length; qi++) {
         const q = questions[qi]
         const questionNode = createTypedBlock(
@@ -150,6 +152,15 @@ function parsePromptToFlow(text: string): {
         questionNode.data.content = q.question
         questionNode.data.followUpStrategy = q.followUpStrategy
         allNodes.push(questionNode)
+        questionIds.push(questionNode.id)
+      }
+
+      for (let qi = 0; qi < questionIds.length - 1; qi++) {
+        edges.push({
+          id: `edge-${questionIds[qi]}-${questionIds[qi + 1]}`,
+          source: questionIds[qi],
+          target: questionIds[qi + 1],
+        })
       }
 
       currentX += LAYOUT.sectionWidth + LAYOUT.horizontalGap
@@ -165,7 +176,6 @@ function parsePromptToFlow(text: string): {
     }
   }
 
-  const edges: Edge[] = []
   for (let i = 0; i < topLevelIds.length - 1; i++) {
     edges.push({
       id: `edge-${topLevelIds[i]}-${topLevelIds[i + 1]}`,
