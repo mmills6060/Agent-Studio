@@ -1,6 +1,6 @@
 "use client"
 
-import { Phone, ClipboardCheck, Plus, X, ChevronRight } from "lucide-react"
+import { Phone, ClipboardCheck, Plus, X, ChevronRight, Pencil } from "lucide-react"
 import {
   Collapsible,
   CollapsibleContent,
@@ -82,21 +82,36 @@ export default function AppSidebar({
                             isActive={tab.id === activeTab}
                             onClick={() => onSwitchTab(tab.id)}
                             onDoubleClick={() => onStartRename(tab.id)}
-                            className="relative pr-6"
+                            className="relative pr-10"
                           >
                             <span className="truncate">{tab.name}</span>
                           </SidebarMenuSubButton>
                         )}
-                        {scoringTabs.length > 1 && editingTabId !== tab.id && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              onDeleteScoringTab(tab.id)
-                            }}
-                            className="absolute right-1 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-sidebar-foreground/50 opacity-0 transition-opacity hover:text-sidebar-foreground group-hover/scoring-item:opacity-100"
-                          >
-                            <X className="size-3" />
-                          </button>
+                        {editingTabId !== tab.id && (
+                          <div className="absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-0.5 opacity-0 transition-opacity group-hover/scoring-item:opacity-100">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onStartRename(tab.id)
+                              }}
+                              className="rounded-sm p-0.5 text-sidebar-foreground/50 hover:text-sidebar-foreground"
+                              title="Rename"
+                            >
+                              <Pencil className="size-3" />
+                            </button>
+                            {scoringTabs.length > 1 && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onDeleteScoringTab(tab.id)
+                                }}
+                                className="rounded-sm p-0.5 text-sidebar-foreground/50 hover:text-sidebar-foreground"
+                                title="Delete"
+                              >
+                                <X className="size-3" />
+                              </button>
+                            )}
+                          </div>
                         )}
                       </SidebarMenuSubItem>
                     ))}

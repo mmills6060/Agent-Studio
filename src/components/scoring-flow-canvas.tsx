@@ -16,9 +16,8 @@ import {
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 import { forwardRef, useCallback, useImperativeHandle, useState } from "react"
-import { Play, Copy, Check, Upload, BarChart3 } from "lucide-react"
+import { Copy, Check, Upload } from "lucide-react"
 import ScoringCustomNode from "@/components/scoring-custom-node"
-import AddNodeToolbar from "@/components/add-node-toolbar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -50,33 +49,28 @@ import {
   generateScoringPrompt,
   type ScoringNodeData,
 } from "@/components/handlers/scoring-flow-canvas-handlers"
-import {
-  ALL_SCORING_BLOCK_TYPES,
-  getScoringBlockType,
-} from "@/lib/scoring-block-types"
+import { getScoringBlockType } from "@/lib/scoring-block-types"
 import { parseScoringPrompt } from "@/components/handlers/scoring-prompt-parser"
 
 interface ScoringFlowCanvasRef {
   getState: () => { nodes: Node<ScoringNodeData>[]; edges: Edge[] }
+  openImport: () => void
+  viewPrompt: () => void
+  addBlock: (blockType: string) => void
 }
 
 interface ScoringFlowProps {
   initialNodes?: Node<ScoringNodeData>[]
   initialEdges?: Edge[]
-  onScoreConversation?: () => void
 }
 
 const nodeTypes = { custom: ScoringCustomNode }
 
 const ScoringFlow = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
-  function ScoringFlow({ initialNodes, initialEdges, onScoreConversation }, ref) {
+  function ScoringFlow({ initialNodes, initialEdges }, ref) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<ScoringNodeData>>(initialNodes ?? [])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges ?? [])
   const { screenToFlowPosition, fitView } = useReactFlow()
-
-  useImperativeHandle(ref, () => ({
-    getState: () => ({ nodes: nodes as Node<ScoringNodeData>[], edges }),
-  }), [nodes, edges])
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [isEditorOpen, setIsEditorOpen] = useState(false)
@@ -144,6 +138,13 @@ const ScoringFlow = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
     setIsOutputOpen(true)
   }, [nodes, edges])
 
+  useImperativeHandle(ref, () => ({
+    getState: () => ({ nodes: nodes as Node<ScoringNodeData>[], edges }),
+    openImport: () => setIsImportOpen(true),
+    viewPrompt: handleRun,
+    addBlock: handleAddBlock,
+  }), [nodes, edges, handleRun, handleAddBlock])
+
   const handleCopyPrompt = useCallback(async () => {
     await navigator.clipboard.writeText(generatedPrompt)
     setIsCopied(true)
@@ -182,36 +183,6 @@ const ScoringFlow = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
         <Background />
         <Controls />
         <MiniMap />
-        <AddNodeToolbar
-          onAddBlock={handleAddBlock}
-          blockTypes={ALL_SCORING_BLOCK_TYPES}
-        />
-        <div className="absolute top-4 right-4 z-10 flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsImportOpen(true)}
-            className="gap-2 bg-background shadow-md"
-          >
-            <Upload className="size-4" />
-            Import
-          </Button>
-          <Button size="sm" onClick={handleRun} className="gap-2 shadow-md">
-            <Play className="size-4" />
-            View prompt
-          </Button>
-          {onScoreConversation && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onScoreConversation}
-              className="gap-2 bg-background shadow-md"
-            >
-              <BarChart3 className="size-4" />
-              Score Conversation
-            </Button>
-          )}
-        </div>
       </ReactFlow>
 
       <Sheet open={isEditorOpen} onOpenChange={setIsEditorOpen}>
@@ -437,7 +408,7 @@ const ScoringFlow = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
 
 const ScoringFlowCanvas = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
   function ScoringFlowCanvas(
-    { initialNodes, initialEdges, onScoreConversation },
+    { initialNodes, initialEdges },
     ref,
   ) {
     return (
@@ -447,7 +418,6 @@ const ScoringFlowCanvas = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
             ref={ref}
             initialNodes={initialNodes}
             initialEdges={initialEdges}
-            onScoreConversation={onScoreConversation}
           />
         </ReactFlowProvider>
       </div>

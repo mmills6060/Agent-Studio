@@ -15,8 +15,13 @@ import {
   saveScoringPromptTabState,
   type ScoringPromptTab,
 } from "@/components/handlers/scoring-prompt-manager-handlers"
+import { Play, Upload, MessageSquare, BarChart3 } from "lucide-react"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
+import { Separator } from "@/components/ui/separator"
+import { Button } from "@/components/ui/button"
+import AddNodeToolbar from "@/components/add-node-toolbar"
 import AppSidebar from "@/components/app-sidebar"
+import { ALL_SCORING_BLOCK_TYPES } from "@/lib/scoring-block-types"
 
 const firstScoringTab = createScoringPromptTab()
 
@@ -112,6 +117,24 @@ export default function PromptWorkspace() {
     setIsScoringResultsOpen(true)
   }, [saveCurrentCanvasState])
 
+  const handleAddBlock = useCallback(
+    (blockType: string) => {
+      if (isCallPrompt) flowCanvasRef.current?.addBlock(blockType)
+      else canvasRef.current?.addBlock(blockType)
+    },
+    [isCallPrompt],
+  )
+
+  const handleImport = useCallback(() => {
+    if (isCallPrompt) flowCanvasRef.current?.openImport()
+    else canvasRef.current?.openImport()
+  }, [isCallPrompt])
+
+  const handleViewPrompt = useCallback(() => {
+    if (isCallPrompt) flowCanvasRef.current?.viewPrompt()
+    else canvasRef.current?.viewPrompt()
+  }, [isCallPrompt])
+
   return (
     <SidebarProvider>
       <AppSidebar
@@ -128,15 +151,38 @@ export default function PromptWorkspace() {
         onRenameKeyDown={handleRenameKeyDown}
       />
       <SidebarInset>
-        <header className="flex h-10 items-center px-2">
+        <header className="flex h-10 items-center gap-2 px-2">
           <SidebarTrigger />
+          <Separator orientation="vertical" className="h-4" />
+          <AddNodeToolbar
+            onAddBlock={handleAddBlock}
+            blockTypes={isCallPrompt ? undefined : ALL_SCORING_BLOCK_TYPES}
+          />
+          <div className="ml-auto flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleImport} className="gap-2">
+              <Upload className="size-4" />
+              Import
+            </Button>
+            <Button size="sm" onClick={handleViewPrompt} className="gap-2">
+              <Play className="size-4" />
+              View prompt
+            </Button>
+            {isCallPrompt ? (
+              <Button variant="outline" size="sm" onClick={handleOpenConversation} className="gap-2">
+                <MessageSquare className="size-4" />
+                Run Conversation
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" onClick={handleOpenScoringResults} className="gap-2">
+                <BarChart3 className="size-4" />
+                Score Conversation
+              </Button>
+            )}
+          </div>
         </header>
         <div className="relative flex-1">
           {isCallPrompt && (
-            <FlowCanvas
-              ref={flowCanvasRef}
-              onRunConversation={handleOpenConversation}
-            />
+            <FlowCanvas ref={flowCanvasRef} />
           )}
           {activeScoringTab && (
             <ScoringFlowCanvas
@@ -144,7 +190,6 @@ export default function PromptWorkspace() {
               ref={canvasRef}
               initialNodes={activeScoringTab.nodes}
               initialEdges={activeScoringTab.edges}
-              onScoreConversation={handleOpenScoringResults}
             />
           )}
         </div>

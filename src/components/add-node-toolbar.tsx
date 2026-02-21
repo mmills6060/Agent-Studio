@@ -25,35 +25,29 @@ interface AddNodeToolbarProps {
 function AddNodeToolbar({ onAddBlock, blockTypes }: AddNodeToolbarProps) {
   const items = blockTypes ?? TOP_LEVEL_BLOCK_TYPES
   return (
-    <div className="absolute top-4 left-4 z-10">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2 bg-background shadow-md"
-          >
-            <Plus className="size-4" />
-            Add Block
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-52">
-          {items.map((blockType) => {
-            const Icon = blockType.icon
-            return (
-              <DropdownMenuItem
-                key={blockType.id}
-                onClick={() => onAddBlock(blockType.id)}
-                className="gap-2"
-              >
-                <Icon className="size-4 shrink-0" />
-                {blockType.label}
-              </DropdownMenuItem>
-            )
-          })}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-2">
+          <Plus className="size-4" />
+          Add Block
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-52">
+        {items.map((blockType) => {
+          const Icon = blockType.icon
+          return (
+            <DropdownMenuItem
+              key={blockType.id}
+              onClick={() => onAddBlock(blockType.id)}
+              className="gap-2"
+            >
+              <Icon className="size-4 shrink-0" />
+              {blockType.label}
+            </DropdownMenuItem>
+          )
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 

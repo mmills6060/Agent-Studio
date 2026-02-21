@@ -16,10 +16,9 @@ import {
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 import { forwardRef, useCallback, useImperativeHandle, useState } from "react"
-import { Play, Copy, Check, Plus, Upload, MessageSquare } from "lucide-react"
+import { Copy, Check, Plus, Upload } from "lucide-react"
 import CustomNode from "@/components/custom-node"
 import SectionNode from "@/components/section-node"
-import AddNodeToolbar from "@/components/add-node-toolbar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -49,25 +48,20 @@ import { getBlockType } from "@/lib/block-types"
 
 interface FlowCanvasRef {
   getPrompt: () => string
-}
-
-interface FlowProps {
-  onRunConversation?: () => void
+  openImport: () => void
+  viewPrompt: () => void
+  addBlock: (blockType: string) => void
 }
 
 const nodeTypes = { custom: CustomNode, section: SectionNode }
 
-const Flow = forwardRef<FlowCanvasRef, FlowProps>(function Flow(
-  { onRunConversation },
+const Flow = forwardRef<FlowCanvasRef, object>(function Flow(
+  _props,
   ref,
 ) {
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
   const { screenToFlowPosition, fitView } = useReactFlow()
-
-  useImperativeHandle(ref, () => ({
-    getPrompt: () => generateSystemPrompt(nodes as Node<CustomNodeData>[], edges as Edge[]),
-  }), [nodes, edges])
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [isEditorOpen, setIsEditorOpen] = useState(false)
@@ -185,6 +179,13 @@ const Flow = forwardRef<FlowCanvasRef, FlowProps>(function Flow(
     setIsOutputOpen(true)
   }, [nodes, edges])
 
+  useImperativeHandle(ref, () => ({
+    getPrompt: () => generateSystemPrompt(nodes as Node<CustomNodeData>[], edges as Edge[]),
+    openImport: () => setIsImportOpen(true),
+    viewPrompt: handleRun,
+    addBlock: handleAddBlock,
+  }), [nodes, edges, handleRun, handleAddBlock])
+
   const handleCopyPrompt = useCallback(async () => {
     await navigator.clipboard.writeText(generatedPrompt)
     setIsCopied(true)
@@ -223,33 +224,6 @@ const Flow = forwardRef<FlowCanvasRef, FlowProps>(function Flow(
         <Background />
         <Controls />
         <MiniMap />
-        <AddNodeToolbar onAddBlock={handleAddBlock} />
-        <div className="absolute top-4 right-4 z-10 flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsImportOpen(true)}
-            className="gap-2 bg-background shadow-md"
-          >
-            <Upload className="size-4" />
-            Import
-          </Button>
-          <Button size="sm" onClick={handleRun} className="gap-2 shadow-md">
-            <Play className="size-4" />
-            View prompt
-          </Button>
-          {onRunConversation && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onRunConversation}
-              className="gap-2 bg-background shadow-md"
-            >
-              <MessageSquare className="size-4" />
-              Run Conversation
-            </Button>
-          )}
-        </div>
       </ReactFlow>
 
       <Sheet open={isEditorOpen} onOpenChange={setIsEditorOpen}>
@@ -423,18 +397,14 @@ const Flow = forwardRef<FlowCanvasRef, FlowProps>(function Flow(
   )
 })
 
-interface FlowCanvasProps {
-  onRunConversation?: () => void
-}
-
-const FlowCanvas = forwardRef<FlowCanvasRef, FlowCanvasProps>(function FlowCanvas(
-  { onRunConversation },
+const FlowCanvas = forwardRef<FlowCanvasRef, object>(function FlowCanvas(
+  _props,
   ref,
 ) {
   return (
     <div className="absolute inset-0">
       <ReactFlowProvider>
-        <Flow ref={ref} onRunConversation={onRunConversation} />
+        <Flow ref={ref} />
       </ReactFlowProvider>
     </div>
   )
