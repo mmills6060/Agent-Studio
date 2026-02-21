@@ -12,16 +12,23 @@ import {
   useReactFlow,
   type OnConnect,
   type Node,
+  type Edge,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 import { useCallback, useState } from "react"
-import { Play, Copy, Check, Plus, Upload } from "lucide-react"
-import CustomNode from "@/components/custom-node"
-import SectionNode from "@/components/section-node"
+import { Play, Copy, Check, Upload } from "lucide-react"
+import ScoringCustomNode from "@/components/scoring-custom-node"
 import AddNodeToolbar from "@/components/add-node-toolbar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Sheet,
   SheetContent,
@@ -38,19 +45,22 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import {
-  createTypedBlock,
-  updateNodeData,
-  generateSystemPrompt,
-  type CustomNodeData,
-} from "@/components/handlers/flow-canvas-handlers"
-import { handleImportPrompt } from "@/components/handlers/import-prompt-handlers"
-import { getBlockType } from "@/lib/block-types"
+  createScoringBlock,
+  updateScoringNodeData,
+  generateScoringPrompt,
+  type ScoringNodeData,
+} from "@/components/handlers/scoring-flow-canvas-handlers"
+import {
+  ALL_SCORING_BLOCK_TYPES,
+  getScoringBlockType,
+} from "@/lib/scoring-block-types"
+import { parseScoringPrompt } from "@/components/handlers/scoring-prompt-parser"
 
-const nodeTypes = { custom: CustomNode, section: SectionNode }
+const nodeTypes = { custom: ScoringCustomNode }
 
-function Flow() {
-  const [nodes, setNodes, onNodesChange] = useNodesState([])
-  const [edges, setEdges, onEdgesChange] = useEdgesState([])
+function ScoringFlow() {
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node<ScoringNodeData>>([])
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
   const { screenToFlowPosition, fitView } = useReactFlow()
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
@@ -62,11 +72,10 @@ function Flow() {
   const [importText, setImportText] = useState("")
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId) as
-    | Node<CustomNodeData>
+    | Node<ScoringNodeData>
     | undefined
 
-  const isQuestionBlock = selectedNode?.data.blockType === "question"
-  const isSectionBlock = selectedNode?.data.blockType === "section"
+  const isAttribute = selectedNode?.data.blockType === "scoring-attribute"
 
   const onConnect: OnConnect = useCallback(
     (connection) => setEdges((eds) => addEdge(connection, eds)),
@@ -82,30 +91,11 @@ function Flow() {
       position.x += (Math.random() - 0.5) * 100
       position.y += (Math.random() - 0.5) * 100
 
-      const newNode = createTypedBlock(blockType, position)
+      const newNode = createScoringBlock(blockType, position)
       setNodes((nds) => [...nds, newNode])
     },
     [screenToFlowPosition, setNodes],
   )
-
-  const handleAddQuestion = useCallback(() => {
-    if (!selectedNodeId || !isSectionBlock) return
-
-    const parentNode = nodes.find((n) => n.id === selectedNodeId)
-    if (!parentNode) return
-
-    const existingChildren = nodes.filter(
-      (n) => n.parentId === selectedNodeId,
-    )
-    const yOffset = 50 + existingChildren.length * 90
-
-    const newQuestion = createTypedBlock(
-      "question",
-      { x: 20, y: yOffset },
-      selectedNodeId,
-    )
-    setNodes((nds) => [...nds, newQuestion])
-  }, [selectedNodeId, isSectionBlock, nodes, setNodes])
 
   const handleNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
@@ -115,45 +105,15 @@ function Flow() {
     [],
   )
 
-  const handleLabelChange = useCallback(
-    (value: string) => {
+  const handleFieldChange = useCallback(
+    (field: string, value: string | number) => {
       if (!selectedNodeId) return
       setNodes(
         (nds) =>
-          updateNodeData(
-            nds as Node<CustomNodeData>[],
+          updateScoringNodeData(
+            nds as Node<ScoringNodeData>[],
             selectedNodeId,
-            { label: value },
-          ),
-      )
-    },
-    [selectedNodeId, setNodes],
-  )
-
-  const handleContentChange = useCallback(
-    (value: string) => {
-      if (!selectedNodeId) return
-      setNodes(
-        (nds) =>
-          updateNodeData(
-            nds as Node<CustomNodeData>[],
-            selectedNodeId,
-            { content: value },
-          ),
-      )
-    },
-    [selectedNodeId, setNodes],
-  )
-
-  const handleFollowUpChange = useCallback(
-    (value: string) => {
-      if (!selectedNodeId) return
-      setNodes(
-        (nds) =>
-          updateNodeData(
-            nds as Node<CustomNodeData>[],
-            selectedNodeId,
-            { followUpStrategy: value },
+            { [field]: value },
           ),
       )
     },
@@ -161,8 +121,8 @@ function Flow() {
   )
 
   const handleRun = useCallback(() => {
-    const prompt = generateSystemPrompt(
-      nodes as Node<CustomNodeData>[],
+    const prompt = generateScoringPrompt(
+      nodes as Node<ScoringNodeData>[],
       edges,
     )
     setGeneratedPrompt(prompt)
@@ -176,7 +136,7 @@ function Flow() {
   }, [generatedPrompt])
 
   const handleImport = useCallback(() => {
-    const { nodes: newNodes, edges: newEdges } = handleImportPrompt(importText)
+    const { nodes: newNodes, edges: newEdges } = parseScoringPrompt(importText)
     if (newNodes.length === 0) return
     setNodes(newNodes)
     setEdges(newEdges)
@@ -186,10 +146,10 @@ function Flow() {
   }, [importText, setNodes, setEdges, fitView])
 
   const blockConfig = selectedNode
-    ? getBlockType(selectedNode.data.blockType)
+    ? getScoringBlockType(selectedNode.data.blockType)
     : null
   const editorTitle = blockConfig
-    ? `Edit ${blockConfig.label} Block`
+    ? `Edit ${blockConfig.label}`
     : "Edit Block"
 
   return (
@@ -207,7 +167,10 @@ function Flow() {
         <Background />
         <Controls />
         <MiniMap />
-        <AddNodeToolbar onAddBlock={handleAddBlock} />
+        <AddNodeToolbar
+          onAddBlock={handleAddBlock}
+          blockTypes={ALL_SCORING_BLOCK_TYPES}
+        />
         <div className="absolute top-4 right-4 z-10 flex gap-2">
           <Button
             variant="outline"
@@ -230,94 +193,142 @@ function Flow() {
           <SheetHeader>
             <SheetTitle>{editorTitle}</SheetTitle>
             <SheetDescription>
-              {isSectionBlock
-                ? "Configure this section and add questions to it."
-                : isQuestionBlock
-                  ? "Set the question text and follow-up strategy."
-                  : "Set the title and content for this block."}
+              {isAttribute
+                ? "Configure the scoring attribute with points, source, rules, and examples."
+                : "Set the title and content for this block."}
             </SheetDescription>
           </SheetHeader>
           <div className="flex flex-col gap-4 px-4">
             <div className="flex flex-col gap-2">
               <label
-                htmlFor="node-label"
+                htmlFor="scoring-label"
                 className="text-sm font-medium text-foreground"
               >
                 Title
               </label>
               <Input
-                id="node-label"
+                id="scoring-label"
                 value={selectedNode?.data.label ?? ""}
-                onChange={(e) => handleLabelChange(e.target.value)}
+                onChange={(e) => handleFieldChange("label", e.target.value)}
                 placeholder={blockConfig?.label ?? "Block Title"}
               />
             </div>
 
-            {isQuestionBlock ? (
+            {isAttribute ? (
               <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-2">
+                    <label
+                      htmlFor="scoring-max-points"
+                      className="text-sm font-medium text-foreground"
+                    >
+                      Max Points
+                    </label>
+                    <Input
+                      id="scoring-max-points"
+                      type="number"
+                      min={0}
+                      value={selectedNode?.data.maxPoints ?? 0}
+                      onChange={(e) =>
+                        handleFieldChange(
+                          "maxPoints",
+                          parseInt(e.target.value, 10) || 0,
+                        )
+                      }
+                      placeholder="0"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label
+                      htmlFor="scoring-source"
+                      className="text-sm font-medium text-foreground"
+                    >
+                      Source
+                    </label>
+                    <Select
+                      value={selectedNode?.data.source ?? ""}
+                      onValueChange={(val) => handleFieldChange("source", val)}
+                    >
+                      <SelectTrigger id="scoring-source">
+                        <SelectValue placeholder="Select source" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="RESUME CONTEXT PRIMARY">
+                          Resume Context Primary
+                        </SelectItem>
+                        <SelectItem value="TRANSCRIPT">Transcript</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
                 <div className="flex flex-col gap-2">
                   <label
-                    htmlFor="node-question"
+                    htmlFor="scoring-goal"
                     className="text-sm font-medium text-foreground"
                   >
-                    Question
+                    Goal
                   </label>
                   <Textarea
-                    id="node-question"
-                    value={selectedNode?.data.content ?? ""}
-                    onChange={(e) => handleContentChange(e.target.value)}
-                    placeholder="Enter the question to ask..."
-                    className="min-h-[120px]"
+                    id="scoring-goal"
+                    value={selectedNode?.data.goal ?? ""}
+                    onChange={(e) => handleFieldChange("goal", e.target.value)}
+                    placeholder="Describe what this attribute measures..."
+                    className="min-h-[80px]"
                   />
                 </div>
                 <div className="flex flex-col gap-2">
                   <label
-                    htmlFor="node-followup"
+                    htmlFor="scoring-rules"
                     className="text-sm font-medium text-foreground"
                   >
-                    Follow-Up Strategy
+                    Scoring Rules
                   </label>
                   <Textarea
-                    id="node-followup"
-                    value={selectedNode?.data.followUpStrategy ?? ""}
-                    onChange={(e) => handleFollowUpChange(e.target.value)}
-                    placeholder="Describe how to follow up based on the candidate's response..."
-                    className="min-h-[120px]"
+                    id="scoring-rules"
+                    value={selectedNode?.data.scoringRules ?? ""}
+                    onChange={(e) =>
+                      handleFieldChange("scoringRules", e.target.value)
+                    }
+                    placeholder="Use these rules in order:&#10;&#10;A) If resume context includes...&#10;B) If &quot;Presently Employed&quot; is missing..."
+                    className="min-h-[160px] font-mono text-sm"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label
+                    htmlFor="scoring-examples"
+                    className="text-sm font-medium text-foreground"
+                  >
+                    Examples
+                  </label>
+                  <Textarea
+                    id="scoring-examples"
+                    value={selectedNode?.data.examples ?? ""}
+                    onChange={(e) =>
+                      handleFieldChange("examples", e.target.value)
+                    }
+                    placeholder='2 = "I&apos;m working right now."&#10;1 = "I left my job a couple months ago."&#10;0 = "I haven&apos;t worked in a while."'
+                    className="min-h-[120px] font-mono text-sm"
                   />
                 </div>
               </>
             ) : (
               <div className="flex flex-col gap-2">
                 <label
-                  htmlFor="node-content"
+                  htmlFor="scoring-content"
                   className="text-sm font-medium text-foreground"
                 >
-                  {isSectionBlock ? "System Instruction" : "Content"}
+                  Content
                 </label>
                 <Textarea
-                  id="node-content"
+                  id="scoring-content"
                   value={selectedNode?.data.content ?? ""}
-                  onChange={(e) => handleContentChange(e.target.value)}
-                  placeholder={
-                    isSectionBlock
-                      ? "Enter a system instruction for this section..."
-                      : "Enter your prompt text here..."
+                  onChange={(e) =>
+                    handleFieldChange("content", e.target.value)
                   }
+                  placeholder="Enter your prompt text here..."
                   className="min-h-[200px]"
                 />
               </div>
-            )}
-
-            {isSectionBlock && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleAddQuestion}
-                className="gap-2 self-start"
-              >
-                <Plus className="size-4" />
-                Add Question
-              </Button>
             )}
           </div>
         </SheetContent>
@@ -326,16 +337,17 @@ function Flow() {
       <Sheet open={isOutputOpen} onOpenChange={setIsOutputOpen}>
         <SheetContent className="flex flex-col sm:max-w-2xl">
           <SheetHeader className="shrink-0">
-            <SheetTitle>Generated System Prompt</SheetTitle>
+            <SheetTitle>Generated Scoring Prompt</SheetTitle>
             <SheetDescription>
-              Your prompt blocks have been combined into a single system prompt.
+              Your scoring blocks have been combined into a single scoring
+              prompt.
             </SheetDescription>
           </SheetHeader>
           <div className="flex min-h-0 flex-1 flex-col gap-4 px-4">
             <div className="min-h-0 flex-1 overflow-auto rounded-md border bg-muted p-4">
               <pre className="whitespace-pre-wrap text-sm text-foreground">
                 {generatedPrompt ||
-                  "No content to display. Add text to your prompt blocks and connect them."}
+                  "No content to display. Add scoring blocks and configure them."}
               </pre>
             </div>
             <Button
@@ -359,16 +371,16 @@ function Flow() {
       <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Import Prompt</DialogTitle>
+            <DialogTitle>Import Scoring Prompt</DialogTitle>
             <DialogDescription>
-              Paste a system prompt to parse it into flow blocks. This will
-              replace any existing nodes on the canvas.
+              Paste a scoring prompt to load it into the canvas. This will
+              replace any existing nodes.
             </DialogDescription>
           </DialogHeader>
           <Textarea
             value={importText}
             onChange={(e) => setImportText(e.target.value)}
-            placeholder="Paste your system prompt here..."
+            placeholder="Paste your scoring prompt here..."
             className="min-h-[200px] max-h-[50vh] overflow-y-auto font-mono text-sm resize-none"
           />
           <DialogFooter>
@@ -396,11 +408,11 @@ function Flow() {
   )
 }
 
-export default function FlowCanvas() {
+export default function ScoringFlowCanvas() {
   return (
     <div className="absolute inset-0">
       <ReactFlowProvider>
-        <Flow />
+        <ScoringFlow />
       </ReactFlowProvider>
     </div>
   )

@@ -1,6 +1,7 @@
 "use client"
 
 import { Plus } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -10,11 +11,19 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { TOP_LEVEL_BLOCK_TYPES } from "@/lib/block-types"
 
-interface AddNodeToolbarProps {
-  onAddBlock: (blockType: string) => void
+interface BlockTypeOption {
+  id: string
+  label: string
+  icon: LucideIcon
 }
 
-function AddNodeToolbar({ onAddBlock }: AddNodeToolbarProps) {
+interface AddNodeToolbarProps {
+  onAddBlock: (blockType: string) => void
+  blockTypes?: BlockTypeOption[]
+}
+
+function AddNodeToolbar({ onAddBlock, blockTypes }: AddNodeToolbarProps) {
+  const items = blockTypes ?? TOP_LEVEL_BLOCK_TYPES
   return (
     <div className="absolute top-4 left-4 z-10">
       <DropdownMenu>
@@ -29,7 +38,7 @@ function AddNodeToolbar({ onAddBlock }: AddNodeToolbarProps) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-52">
-          {TOP_LEVEL_BLOCK_TYPES.map((blockType) => {
+          {items.map((blockType) => {
             const Icon = blockType.icon
             return (
               <DropdownMenuItem
