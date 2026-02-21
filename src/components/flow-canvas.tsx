@@ -12,9 +12,10 @@ import {
   useReactFlow,
   type OnConnect,
   type Node,
+  type Edge,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
-import { useCallback, useState } from "react"
+import { forwardRef, useCallback, useImperativeHandle, useState } from "react"
 import { Play, Copy, Check, Plus, Upload } from "lucide-react"
 import CustomNode from "@/components/custom-node"
 import SectionNode from "@/components/section-node"
@@ -46,12 +47,20 @@ import {
 import { handleImportPrompt } from "@/components/handlers/import-prompt-handlers"
 import { getBlockType } from "@/lib/block-types"
 
+interface FlowCanvasRef {
+  getPrompt: () => string
+}
+
 const nodeTypes = { custom: CustomNode, section: SectionNode }
 
-function Flow() {
+const Flow = forwardRef<FlowCanvasRef>(function Flow(_props, ref) {
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
   const { screenToFlowPosition, fitView } = useReactFlow()
+
+  useImperativeHandle(ref, () => ({
+    getPrompt: () => generateSystemPrompt(nodes as Node<CustomNodeData>[], edges as Edge[]),
+  }), [nodes, edges])
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [isEditorOpen, setIsEditorOpen] = useState(false)
@@ -394,14 +403,17 @@ function Flow() {
       </Dialog>
     </>
   )
-}
+})
 
-export default function FlowCanvas() {
+const FlowCanvas = forwardRef<FlowCanvasRef>(function FlowCanvas(_props, ref) {
   return (
     <div className="absolute inset-0">
       <ReactFlowProvider>
-        <Flow />
+        <Flow ref={ref} />
       </ReactFlowProvider>
     </div>
   )
-}
+})
+
+export default FlowCanvas
+export type { FlowCanvasRef }

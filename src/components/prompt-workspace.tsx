@@ -1,10 +1,14 @@
 "use client"
 
 import { useCallback, useRef, useState } from "react"
-import { Phone, ClipboardCheck, Plus, X } from "lucide-react"
+import { Phone, ClipboardCheck, Plus, X, MessageSquare, BarChart3 } from "lucide-react"
 import FlowCanvas from "@/components/flow-canvas"
+import type { FlowCanvasRef } from "@/components/flow-canvas"
 import ScoringFlowCanvas from "@/components/scoring-flow-canvas"
 import type { ScoringFlowCanvasRef } from "@/components/scoring-flow-canvas"
+import ConversationPanel from "@/components/conversation-panel"
+import ScoringResultsPanel from "@/components/scoring-results-panel"
+import type { ConversationMessage } from "@/components/handlers/conversation-handlers"
 import {
   createScoringPromptTab,
   renameScoringPromptTab,
@@ -20,7 +24,12 @@ export default function PromptWorkspace() {
   const [scoringTabs, setScoringTabs] = useState<ScoringPromptTab[]>([firstScoringTab])
   const [editingTabId, setEditingTabId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState("")
+  const [isConversationOpen, setIsConversationOpen] = useState(false)
+  const [conversationPrompt, setConversationPrompt] = useState("")
+  const [conversationMessages, setConversationMessages] = useState<ConversationMessage[]>([])
+  const [isScoringResultsOpen, setIsScoringResultsOpen] = useState(false)
   const canvasRef = useRef<ScoringFlowCanvasRef>(null)
+  const flowCanvasRef = useRef<FlowCanvasRef>(null)
 
   const isCallPrompt = activeTab === "call-prompt"
   const activeScoringTab = scoringTabs.find((t) => t.id === activeTab)
@@ -90,6 +99,17 @@ export default function PromptWorkspace() {
     },
     [handleFinishRename],
   )
+
+  const handleOpenConversation = useCallback(() => {
+    const prompt = flowCanvasRef.current?.getPrompt() ?? ""
+    setConversationPrompt(prompt)
+    setIsConversationOpen(true)
+  }, [])
+
+  const handleOpenScoringResults = useCallback(() => {
+    saveCurrentCanvasState()
+    setIsScoringResultsOpen(true)
+  }, [saveCurrentCanvasState])
 
   return (
     <div className="fixed inset-0">
@@ -166,11 +186,33 @@ export default function PromptWorkspace() {
           >
             <Plus className="size-4" />
           </button>
+
+          {isCallPrompt && (
+            <>
+              <div className="mx-1 h-5 w-px bg-border" />
+              <button
+                onClick={handleOpenConversation}
+                className="flex shrink-0 items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <MessageSquare className="size-4" />
+                Run Conversation
+              </button>
+            </>
+          )}
+
+          <div className="mx-1 h-5 w-px bg-border" />
+          <button
+            onClick={handleOpenScoringResults}
+            className="flex shrink-0 items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <BarChart3 className="size-4" />
+            Score Conversation
+          </button>
         </div>
       </div>
 
       <div className="relative size-full">
-        {isCallPrompt && <FlowCanvas />}
+        {isCallPrompt && <FlowCanvas ref={flowCanvasRef} />}
         {activeScoringTab && (
           <ScoringFlowCanvas
             key={activeScoringTab.id}
@@ -180,6 +222,21 @@ export default function PromptWorkspace() {
           />
         )}
       </div>
+
+      <ConversationPanel
+        isOpen={isConversationOpen}
+        onOpenChange={setIsConversationOpen}
+        callPrompt={conversationPrompt}
+        onMessagesChange={setConversationMessages}
+      />
+
+      <ScoringResultsPanel
+        isOpen={isScoringResultsOpen}
+        onOpenChange={setIsScoringResultsOpen}
+        scoringTabs={scoringTabs}
+        activeTabId={activeTab}
+        conversationMessages={conversationMessages}
+      />
     </div>
   )
 }
