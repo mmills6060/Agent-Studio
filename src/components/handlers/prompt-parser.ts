@@ -21,9 +21,11 @@ const SECTION_INNER_TAG_PATTERN =
   /\[(SYSTEM INSTRUCTION|CURRENT QUESTION|FOLLOW-UP STRATEGY)\]/g
 
 const LAYOUT = {
-  baseX: 200,
-  baseY: 100,
-  simpleBlockSpacing: 400,
+  baseX: 100,
+  baseY: 200,
+  simpleBlockWidth: 220,
+  sectionWidth: 460,
+  horizontalGap: 80,
   sectionBaseHeight: 200,
   questionHeight: 90,
   questionYStart: 50,
@@ -114,7 +116,7 @@ function parsePromptToFlow(text: string): {
 
   const allNodes: Node<CustomNodeData>[] = []
   const topLevelIds: string[] = []
-  let currentY = LAYOUT.baseY
+  let currentX = LAYOUT.baseX
 
   for (const block of blocks) {
     if (block.blockTypeId === "section") {
@@ -127,12 +129,12 @@ function parsePromptToFlow(text: string): {
       )
 
       const sectionNode = createTypedBlock("section", {
-        x: LAYOUT.baseX,
-        y: currentY,
+        x: currentX,
+        y: LAYOUT.baseY,
       })
       sectionNode.data.label = sectionLabel
       sectionNode.data.content = systemInstruction
-      sectionNode.style = { width: 460, height: sectionHeight }
+      sectionNode.style = { width: LAYOUT.sectionWidth, height: sectionHeight }
 
       allNodes.push(sectionNode)
       topLevelIds.push(sectionNode.id)
@@ -150,16 +152,16 @@ function parsePromptToFlow(text: string): {
         allNodes.push(questionNode)
       }
 
-      currentY += sectionHeight + 100
+      currentX += LAYOUT.sectionWidth + LAYOUT.horizontalGap
     } else {
       const node = createTypedBlock(block.blockTypeId, {
-        x: LAYOUT.baseX,
-        y: currentY,
+        x: currentX,
+        y: LAYOUT.baseY,
       })
       node.data.content = block.content
       allNodes.push(node)
       topLevelIds.push(node.id)
-      currentY += LAYOUT.simpleBlockSpacing
+      currentX += LAYOUT.simpleBlockWidth + LAYOUT.horizontalGap
     }
   }
 
