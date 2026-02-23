@@ -81,6 +81,7 @@ const ScoringFlow = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
   const [isCopied, setIsCopied] = useState(false)
   const [isImportOpen, setIsImportOpen] = useState(false)
   const [importText, setImportText] = useState("")
+  const [importError, setImportError] = useState("")
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId) as
     | Node<ScoringNodeData>
@@ -219,12 +220,17 @@ const ScoringFlow = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
     setIsOutputOpen(true)
   }, [nodes, edges])
 
+  const handleOpenImport = useCallback(() => {
+    setImportError("")
+    setIsImportOpen(true)
+  }, [])
+
   useImperativeHandle(ref, () => ({
     getState: () => ({ nodes: nodes as Node<ScoringNodeData>[], edges }),
-    openImport: () => setIsImportOpen(true),
+    openImport: handleOpenImport,
     viewPrompt: handleRun,
     addBlock: handleAddBlock,
-  }), [nodes, edges, handleRun, handleAddBlock])
+  }), [nodes, edges, handleRun, handleAddBlock, handleOpenImport])
 
   const handleCopyPrompt = useCallback(async () => {
     await navigator.clipboard.writeText(generatedPrompt)
@@ -233,13 +239,21 @@ const ScoringFlow = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
   }, [generatedPrompt])
 
   const handleImport = useCallback(() => {
-    const { nodes: newNodes, edges: newEdges } = parseScoringPrompt(importText)
-    if (newNodes.length === 0) return
-    setNodes(newNodes)
-    setEdges(newEdges)
-    setImportText("")
-    setIsImportOpen(false)
-    setTimeout(() => fitView({ padding: 0.2 }), 50)
+    setImportError("")
+    try {
+      const { nodes: newNodes, edges: newEdges } = parseScoringPrompt(importText)
+      if (newNodes.length === 0) {
+        setImportError("Could not parse the text. Make sure it contains recognizable scoring prompt sections.")
+        return
+      }
+      setNodes(newNodes)
+      setEdges(newEdges)
+      setImportText("")
+      setIsImportOpen(false)
+      setTimeout(() => fitView({ padding: 0.2 }), 50)
+    } catch {
+      setImportError("An error occurred while parsing the prompt. Check the format and try again.")
+    }
   }, [importText, setNodes, setEdges, fitView])
 
   const blockConfig = selectedNode
@@ -575,15 +589,22 @@ const ScoringFlow = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
           </DialogHeader>
           <Textarea
             value={importText}
-            onChange={(e) => setImportText(e.target.value)}
+            onChange={(e) => {
+              setImportText(e.target.value)
+              if (importError) setImportError("")
+            }}
             placeholder="Paste your scoring prompt here..."
             className="min-h-[200px] max-h-[50vh] overflow-y-auto font-mono text-sm resize-none"
           />
+          {importError && (
+            <p className="text-sm text-destructive">{importError}</p>
+          )}
           <DialogFooter>
             <Button
               variant="outline"
               onClick={() => {
                 setImportText("")
+                setImportError("")
                 setIsImportOpen(false)
               }}
             >

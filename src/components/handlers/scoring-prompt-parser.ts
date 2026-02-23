@@ -194,7 +194,12 @@ function parseScoringPrompt(text: string): {
   }
   if (currentSection) sections.push(currentSection)
 
-  if (sections.length === 0) return { nodes: [], edges: [] }
+  if (sections.length === 0) {
+    const trimmed = text.trim()
+    if (!trimmed) return { nodes: [], edges: [] }
+    addNode("indicator-overview", { label: "Imported Content", content: trimmed })
+    return { nodes: allNodes, edges: [] }
+  }
 
   for (const section of sections) {
     const content = section.content.trim()

@@ -138,6 +138,9 @@ function getBlockTypeByTag(rawTag: string): BlockTypeConfig | undefined {
   if (normalized.startsWith("[SECTION"))
     return BLOCK_TYPES.section
 
+  if (normalized.startsWith("[INSTRUCTIONS"))
+    return BLOCK_TYPES.instructions
+
   return undefined
 }
 

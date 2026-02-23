@@ -15,10 +15,10 @@ interface ParsedQuestion {
 }
 
 const TOP_LEVEL_TAG_PATTERN =
-  /^\[(PERSONA|JOB INFO|RULES|SCENARIO|INSTRUCTIONS|SECTION\s*[\d]*\s*:?[^\]]*|FAQ|GLOBAL CONSTRAINT)\]/gm
+  /^\[(PERSONA|JOB INFO|RULES|SCENARIO|INSTRUCTIONS[^\]]*|SECTION\s*[\d]*\s*:?[^\]]*|FAQ|GLOBAL CONSTRAINT)\]/gmi
 
 const SECTION_INNER_TAG_PATTERN =
-  /\[(SYSTEM INSTRUCTION|CURRENT QUESTION|FOLLOW-UP STRATEGY)\]/g
+  /\[(SYSTEM INSTRUCTION|CURRENT QUESTION|FOLLOW-UP STRATEGY|LAST QUESTION)[^\]]*\]/gi
 
 const LAYOUT = {
   baseX: 100,
@@ -92,14 +92,19 @@ function parseSectionBody(content: string): {
       i < matches.length - 1 ? matches[i + 1].index! : content.length
     const tagContent = content.slice(startIdx, endIdx).trim()
 
-    if (tagType === "SYSTEM INSTRUCTION") {
+    const normalizedTag = tagType.toUpperCase()
+
+    if (normalizedTag === "SYSTEM INSTRUCTION") {
       systemInstruction = tagContent
-    } else if (tagType === "CURRENT QUESTION") {
+    } else if (
+      normalizedTag === "CURRENT QUESTION" ||
+      normalizedTag === "LAST QUESTION"
+    ) {
       questions.push({
         question: stripQuotes(tagContent),
         followUpStrategy: "",
       })
-    } else if (tagType === "FOLLOW-UP STRATEGY" && questions.length > 0) {
+    } else if (normalizedTag === "FOLLOW-UP STRATEGY" && questions.length > 0) {
       questions[questions.length - 1].followUpStrategy = tagContent
     }
   }
