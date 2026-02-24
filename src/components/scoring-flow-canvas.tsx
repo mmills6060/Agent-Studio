@@ -339,11 +339,12 @@ const ScoringFlow = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
                       id="scoring-max-points"
                       type="number"
                       min={0}
+                      step="any"
                       value={selectedNode?.data.maxPoints ?? 0}
                       onChange={(e) =>
                         handleFieldChange(
                           "maxPoints",
-                          parseInt(e.target.value, 10) || 0,
+                          parseFloat(e.target.value) || 0,
                         )
                       }
                       placeholder="0"
@@ -402,15 +403,16 @@ const ScoringFlow = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
                         <Input
                           type="number"
                           min={0}
+                          step="any"
                           value={level.value}
                           onChange={(e) =>
                             handleScoreLevelChange(
                               levelIdx,
                               "value",
-                              parseInt(e.target.value, 10) || 0,
+                              parseFloat(e.target.value) || 0,
                             )
                           }
-                          className="h-8 w-16 text-center font-mono text-sm"
+                          className="h-8 w-20 text-center font-mono text-sm"
                         />
                         <span className="text-sm text-muted-foreground">=</span>
                         <Input
