@@ -183,6 +183,14 @@ function formatScoringNode(node: Node<ScoringNodeData>): string {
   }
 }
 
+function hasDecimalValues(nodes: Node<ScoringNodeData>[]): boolean {
+  return nodes.some((node) => {
+    if (node.data.blockType !== "scoring-attribute") return false
+    if (!Number.isInteger(node.data.maxPoints)) return true
+    return node.data.scoreLevels.some((level) => !Number.isInteger(level.value))
+  })
+}
+
 function generateScoringPrompt(
   nodes: Node<ScoringNodeData>[],
   edges: Edge[],
@@ -219,6 +227,10 @@ function generateScoringPrompt(
       .filter((t) => t.trim().length > 0)
     if (attributeSections.length > 0)
       sections.push(`${scaleHeader}\n\n${attributeSections.join("\n\n")}`)
+  }
+
+  if (hasDecimalValues(attributeNodes)) {
+    sections.push("Important: If the calculated score is a decimal, always round up to the nearest whole number.")
   }
 
   return sections.join("\n\n")

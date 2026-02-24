@@ -2,7 +2,7 @@ import type { Node, Edge } from "@xyflow/react"
 import { createScoringBlock, type ScoringNodeData, type ScoreLevel } from "./scoring-flow-canvas-handlers"
 
 const ATTRIBUTE_HEADER_PATTERN =
-  /^(.+?)\s*[–—-]\s*(\d+)\s*points?(?:\s*\(([^)]+)\))?\s*$/
+  /^(.+?)\s*[–—-]\s*(\d+(?:\.\d+)?)\s*points?(?:\s*\(([^)]+)\))?\s*$/
 
 const SECTION_HEADERS = [
   { pattern: /^what this indicator assesses$/i, blockType: "indicator-overview" },
@@ -30,7 +30,7 @@ interface ParsedAttribute {
   scoreLevels: ScoreLevel[]
 }
 
-const SCORE_LEVEL_PATTERN = /^(\d+)\s*=\s*(.+)$/
+const SCORE_LEVEL_PATTERN = /^(\d+(?:\.\d+)?)\s*=\s*(.+)$/
 
 function parseScoreLevels(body: string): ScoreLevel[] {
   const lines = body.split("\n")
@@ -44,7 +44,7 @@ function parseScoreLevels(body: string): ScoreLevel[] {
     if (levelMatch) {
       if (current) levels.push(current)
       current = {
-        value: parseInt(levelMatch[1], 10),
+        value: parseFloat(levelMatch[1]),
         description: levelMatch[2].trim(),
         examples: [],
       }
@@ -87,7 +87,7 @@ function parseAttributeBlock(text: string): ParsedAttribute | null {
   if (!headerMatch) return null
 
   const name = headerMatch[1].trim()
-  const maxPoints = parseInt(headerMatch[2], 10)
+  const maxPoints = parseFloat(headerMatch[2])
   const source = (headerMatch[3] ?? "").trim()
 
   const body = lines.slice(1).join("\n").trim()
