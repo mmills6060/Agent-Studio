@@ -18,7 +18,7 @@ const accentColorMap: Record<string, string> = {
   "border-l-destructive": "border-l-destructive",
 }
 
-function CustomNode({ data }: NodeProps<CustomNodeType>) {
+function CustomNode({ data, selected }: NodeProps<CustomNodeType>) {
   const hasContent = data.content?.trim().length > 0
   const config = getBlockType(data.blockType)
   const Icon = config?.icon ?? MessageSquare
@@ -28,7 +28,7 @@ function CustomNode({ data }: NodeProps<CustomNodeType>) {
 
   return (
     <div
-      className={`min-w-[180px] max-w-[260px] rounded-lg border border-l-4 ${accentClass} bg-card px-4 py-3 shadow-sm`}
+      className={`min-w-[180px] max-w-[260px] rounded-lg border border-l-4 ${accentClass} bg-card px-4 py-3 shadow-sm transition-shadow ${selected ? "ring-2 ring-primary/50 shadow-md" : ""}`}
     >
       <Handle
         type="target"

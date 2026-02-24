@@ -14,7 +14,7 @@ type SectionNodeType = Node<CustomNodeData, "section">
 
 function SectionNode({ data, selected }: NodeProps<SectionNodeType>) {
   return (
-    <div className="flex size-full flex-col rounded-lg border-2 border-dashed border-primary/30 bg-muted/30">
+    <div className={`flex size-full flex-col rounded-lg border-2 border-dashed bg-muted/30 transition-shadow ${selected ? "border-primary/60 ring-2 ring-primary/50 shadow-md" : "border-primary/30"}`}>
       <NodeResizer
         isVisible={selected}
         minWidth={300}

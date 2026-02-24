@@ -18,7 +18,7 @@ const accentColorMap: Record<string, string> = {
   "border-l-destructive": "border-l-destructive",
 }
 
-function ScoringCustomNode({ data }: NodeProps<ScoringCustomNodeType>) {
+function ScoringCustomNode({ data, selected }: NodeProps<ScoringCustomNodeType>) {
   const config = getScoringBlockType(data.blockType)
   const Icon = config?.icon ?? MessageSquare
   const accentClass = config
@@ -35,7 +35,7 @@ function ScoringCustomNode({ data }: NodeProps<ScoringCustomNodeType>) {
 
   return (
     <div
-      className={`min-w-[180px] max-w-[260px] rounded-lg border border-l-4 ${accentClass} bg-card px-4 py-3 shadow-sm`}
+      className={`min-w-[180px] max-w-[260px] rounded-lg border border-l-4 ${accentClass} bg-card px-4 py-3 shadow-sm transition-shadow ${selected ? "ring-2 ring-primary/50 shadow-md" : ""}`}
     >
       <Handle
         type="target"
