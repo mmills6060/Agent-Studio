@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useRef, useState } from "react"
+import type { Node, Edge } from "@xyflow/react"
 import FlowCanvas from "@/components/flow-canvas"
 import type { FlowCanvasRef } from "@/components/flow-canvas"
 import ScoringFlowCanvas from "@/components/scoring-flow-canvas"
@@ -15,6 +16,7 @@ import {
   saveScoringPromptTabState,
   type ScoringPromptTab,
 } from "@/components/handlers/scoring-prompt-manager-handlers"
+import type { ScoringNodeData } from "@/components/handlers/scoring-flow-canvas-handlers"
 import { Play, Upload, MessageSquare, BarChart3 } from "lucide-react"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
@@ -137,6 +139,19 @@ export default function PromptWorkspace() {
     else canvasRef.current?.viewPrompt()
   }, [isCallPrompt])
 
+  const handleCreateScoringPrompt = useCallback(
+    (nodes: Node<ScoringNodeData>[], edges: Edge[], tabName: string) => {
+      saveCurrentCanvasState()
+      const newTab = createScoringPromptTab(tabName)
+      newTab.nodes = nodes
+      newTab.edges = edges
+      setScoringTabs((prev) => [...prev, newTab])
+      setCurrentScoringTabId(newTab.id)
+      setActiveTab(newTab.id)
+    },
+    [saveCurrentCanvasState],
+  )
+
   return (
     <SidebarProvider>
       <AppSidebar
@@ -184,7 +199,7 @@ export default function PromptWorkspace() {
         </header>
         <div className="relative flex-1">
           <div className={isCallPrompt ? "" : "hidden"}>
-            <FlowCanvas ref={flowCanvasRef} />
+            <FlowCanvas ref={flowCanvasRef} onCreateScoringPrompt={handleCreateScoringPrompt} />
           </div>
           <div className={isCallPrompt ? "hidden" : ""}>
             <ScoringFlowCanvas

@@ -16,7 +16,7 @@ import {
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 import { forwardRef, useCallback, useImperativeHandle, useState } from "react"
-import { Copy, Check, Plus, Upload, Loader2, Sparkles } from "lucide-react"
+import { Copy, Check, Plus, Upload, Sparkles } from "lucide-react"
 import CustomNode from "@/components/custom-node"
 import SectionNode from "@/components/section-node"
 import { Button } from "@/components/ui/button"
@@ -46,9 +46,9 @@ import {
 import { handleImportPrompt } from "@/components/handlers/import-prompt-handlers"
 import {
   collectSectionContent,
-  generateScoringPromptFromSection,
+  buildScoringNodesFromSection,
+  generateAttributeKeys,
 } from "@/components/handlers/scoring-prompt-generation-handlers"
-import { parseScoringPrompt } from "@/components/handlers/scoring-prompt-parser"
 import { getBlockType } from "@/lib/block-types"
 
 interface FlowCanvasRef {
@@ -79,6 +79,7 @@ const Flow = forwardRef<FlowCanvasRef, FlowCanvasProps>(function Flow(
   const [isCopied, setIsCopied] = useState(false)
   const [isImportOpen, setIsImportOpen] = useState(false)
   const [importText, setImportText] = useState("")
+  const [hasNoQuestions, setHasNoQuestions] = useState(false)
   const [isGeneratingScoring, setIsGeneratingScoring] = useState(false)
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId) as
@@ -144,19 +145,31 @@ const Flow = forwardRef<FlowCanvasRef, FlowCanvasProps>(function Flow(
       nodes as Node<CustomNodeData>[],
       selectedNodeId,
     )
-    if (!sectionContent) return
+    if (!sectionContent || sectionContent.questions.length === 0) {
+      setHasNoQuestions(true)
+      setTimeout(() => setHasNoQuestions(false), 2000)
+      return
+    }
 
     setIsGeneratingScoring(true)
     try {
-      const scoringText = await generateScoringPromptFromSection(sectionContent)
-      const { nodes: scoringNodes, edges: scoringEdges } = parseScoringPrompt(scoringText)
+      const keys = await generateAttributeKeys(
+        sectionContent.label,
+        sectionContent.questions,
+      )
+      const { nodes: scoringNodes, edges: scoringEdges } = buildScoringNodesFromSection(sectionContent, keys)
       const sectionNode = nodes.find((n) => n.id === selectedNodeId)
       const tabName = sectionNode?.data.label
         ? `${(sectionNode.data as CustomNodeData).label} Scoring`
-        : "Generated Scoring"
+        : "Section Scoring"
       props.onCreateScoringPrompt(scoringNodes, scoringEdges, tabName)
-    } catch (err) {
-      console.error("Failed to generate scoring prompt:", err)
+    } catch {
+      const { nodes: scoringNodes, edges: scoringEdges } = buildScoringNodesFromSection(sectionContent)
+      const sectionNode = nodes.find((n) => n.id === selectedNodeId)
+      const tabName = sectionNode?.data.label
+        ? `${(sectionNode.data as CustomNodeData).label} Scoring`
+        : "Section Scoring"
+      props.onCreateScoringPrompt(scoringNodes, scoringEdges, tabName)
     } finally {
       setIsGeneratingScoring(false)
     }
@@ -369,15 +382,15 @@ const Flow = forwardRef<FlowCanvasRef, FlowCanvasProps>(function Flow(
                 <Button
                   size="sm"
                   onClick={handleCreateScoringPrompt}
-                  disabled={isGeneratingScoring || !props.onCreateScoringPrompt}
+                  disabled={!props.onCreateScoringPrompt || isGeneratingScoring}
                   className="gap-2 self-start"
                 >
-                  {isGeneratingScoring ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Sparkles className="size-4" />
-                  )}
-                  {isGeneratingScoring ? "Generating..." : "Create Scoring Prompt"}
+                  <Sparkles className={`size-4 ${isGeneratingScoring ? "animate-spin" : ""}`} />
+                  {hasNoQuestions
+                    ? "Add questions first"
+                    : isGeneratingScoring
+                      ? "Generating..."
+                      : "Create Scoring Prompt"}
                 </Button>
               </div>
             )}
