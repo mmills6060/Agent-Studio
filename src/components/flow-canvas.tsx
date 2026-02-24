@@ -53,9 +53,11 @@ import { getBlockType } from "@/lib/block-types"
 
 interface FlowCanvasRef {
   getPrompt: () => string
+  getState: () => { nodes: Node<CustomNodeData>[]; edges: Edge[] }
   openImport: () => void
   viewPrompt: () => void
   addBlock: (blockType: string) => void
+  setState: (nodes: Node<CustomNodeData>[], edges: Edge[]) => void
 }
 
 interface FlowCanvasProps {
@@ -239,10 +241,16 @@ const Flow = forwardRef<FlowCanvasRef, FlowCanvasProps>(function Flow(
 
   useImperativeHandle(ref, () => ({
     getPrompt: () => generateSystemPrompt(nodes as Node<CustomNodeData>[], edges as Edge[]),
+    getState: () => ({ nodes: nodes as Node<CustomNodeData>[], edges: edges as Edge[] }),
     openImport: () => setIsImportOpen(true),
     viewPrompt: handleRun,
     addBlock: handleAddBlock,
-  }), [nodes, edges, handleRun, handleAddBlock])
+    setState: (newNodes: Node<CustomNodeData>[], newEdges: Edge[]) => {
+      setNodes(newNodes)
+      setEdges(newEdges)
+      setTimeout(() => fitView({ padding: 0.2 }), 50)
+    },
+  }), [nodes, edges, handleRun, handleAddBlock, setNodes, setEdges, fitView])
 
   const handleCopyPrompt = useCallback(async () => {
     await navigator.clipboard.writeText(generatedPrompt)

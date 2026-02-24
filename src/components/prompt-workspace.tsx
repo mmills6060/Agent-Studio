@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import type { Node, Edge } from "@xyflow/react"
 import FlowCanvas from "@/components/flow-canvas"
 import type { FlowCanvasRef } from "@/components/flow-canvas"
@@ -17,13 +17,14 @@ import {
   type ScoringPromptTab,
 } from "@/components/handlers/scoring-prompt-manager-handlers"
 import type { ScoringNodeData } from "@/components/handlers/scoring-flow-canvas-handlers"
-import { Play, Upload, MessageSquare, BarChart3 } from "lucide-react"
+import { Play, Upload, MessageSquare, BarChart3, Save, Check } from "lucide-react"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
 import AddNodeToolbar from "@/components/add-node-toolbar"
 import AppSidebar from "@/components/app-sidebar"
 import { ALL_SCORING_BLOCK_TYPES } from "@/lib/scoring-block-types"
+import { saveWorkspace, loadWorkspace } from "@/components/handlers/workspace-save-handlers"
 
 const firstScoringTab = createScoringPromptTab()
 
@@ -121,6 +122,45 @@ export default function PromptWorkspace() {
     setIsScoringResultsOpen(true)
   }, [saveCurrentCanvasState])
 
+  const [isSaved, setIsSaved] = useState(false)
+
+  const handleSave = useCallback(() => {
+    saveCurrentCanvasState()
+    const callPromptState = flowCanvasRef.current?.getState() ?? { nodes: [], edges: [] }
+    const latestScoringTabs = (() => {
+      if (!isCallPrompt && canvasRef.current) {
+        const { nodes, edges } = canvasRef.current.getState()
+        return saveScoringPromptTabState(scoringTabs, activeTab, nodes, edges)
+      }
+      return scoringTabs
+    })()
+    const success = saveWorkspace({
+      callPrompt: callPromptState,
+      scoringTabs: latestScoringTabs,
+      activeTab,
+      currentScoringTabId,
+    })
+    if (success) {
+      setIsSaved(true)
+      setTimeout(() => setIsSaved(false), 2000)
+    }
+  }, [saveCurrentCanvasState, scoringTabs, activeTab, currentScoringTabId, isCallPrompt])
+
+  useEffect(() => {
+    const saved = loadWorkspace()
+    if (!saved) return
+    if (saved.callPrompt.nodes.length > 0) {
+      setTimeout(() => {
+        flowCanvasRef.current?.setState(saved.callPrompt.nodes, saved.callPrompt.edges)
+      }, 100)
+    }
+    if (saved.scoringTabs.length > 0) {
+      setScoringTabs(saved.scoringTabs)
+      setCurrentScoringTabId(saved.currentScoringTabId || saved.scoringTabs[0].id)
+    }
+    if (saved.activeTab) setActiveTab(saved.activeTab)
+  }, [])
+
   const handleAddBlock = useCallback(
     (blockType: string) => {
       if (isCallPrompt) flowCanvasRef.current?.addBlock(blockType)
@@ -176,6 +216,10 @@ export default function PromptWorkspace() {
             blockTypes={isCallPrompt ? undefined : ALL_SCORING_BLOCK_TYPES}
           />
           <div className="ml-auto flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleSave} className="gap-2">
+              {isSaved ? <Check className="size-4" /> : <Save className="size-4" />}
+              {isSaved ? "Saved!" : "Save"}
+            </Button>
             <Button variant="outline" size="sm" onClick={handleImport} className="gap-2">
               <Upload className="size-4" />
               Import
