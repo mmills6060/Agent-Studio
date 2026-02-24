@@ -5,6 +5,7 @@ import {
   ListOrdered,
   ShieldAlert,
   Braces,
+  Box,
   type LucideIcon,
 } from "lucide-react"
 
@@ -57,6 +58,13 @@ const SCORING_BLOCK_TYPES: Record<string, ScoringBlockTypeConfig> = {
     label: "Output Format",
     icon: Braces,
     accentColor: "border-l-primary",
+    hasAttributeFields: false,
+  },
+  "generic": {
+    id: "generic",
+    label: "Generic",
+    icon: Box,
+    accentColor: "border-l-chart-3",
     hasAttributeFields: false,
   },
 }
