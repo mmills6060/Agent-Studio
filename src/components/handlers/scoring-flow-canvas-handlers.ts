@@ -175,6 +175,9 @@ function formatScoringNode(node: Node<ScoringNodeData>): string {
       const header = "Standardized Output Format"
       return content.trim() ? `${header}\n${content.trim()}` : ""
     }
+    case "generic": {
+      return content.trim() ? `${label}\n${content.trim()}` : ""
+    }
     default:
       return content.trim() ?? ""
   }
