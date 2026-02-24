@@ -6,9 +6,9 @@ import type { CustomNodeData } from "@/components/handlers/flow-canvas-handlers"
 
 type SectionNodeType = Node<CustomNodeData, "section">
 
-function SectionNode({ data }: NodeProps<SectionNodeType>) {
+function SectionNode({ data, selected }: NodeProps<SectionNodeType>) {
   return (
-    <div className="flex size-full flex-col rounded-lg border-2 border-dashed border-primary/30 bg-muted/30">
+    <div className={`flex size-full flex-col rounded-lg border-2 border-dashed bg-muted/30 transition-shadow ${selected ? "border-primary ring-2 ring-primary shadow-md" : "border-primary/30"}`}>
       <Handle
         type="target"
         position={Position.Left}
