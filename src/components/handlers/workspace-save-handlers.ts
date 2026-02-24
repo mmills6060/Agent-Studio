@@ -35,5 +35,9 @@ function loadWorkspace(): WorkspaceState | null {
   }
 }
 
-export { saveWorkspace, loadWorkspace, STORAGE_KEY }
+function clearWorkspace(): void {
+  localStorage.removeItem(STORAGE_KEY)
+}
+
+export { saveWorkspace, loadWorkspace, clearWorkspace, STORAGE_KEY }
 export type { WorkspaceState }

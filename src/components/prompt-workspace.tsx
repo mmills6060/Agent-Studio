@@ -17,14 +17,25 @@ import {
   type ScoringPromptTab,
 } from "@/components/handlers/scoring-prompt-manager-handlers"
 import type { ScoringNodeData } from "@/components/handlers/scoring-flow-canvas-handlers"
-import { Play, Upload, MessageSquare, BarChart3, Save, Check } from "lucide-react"
+import { Play, Upload, MessageSquare, BarChart3, Save, Check, Trash2 } from "lucide-react"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
 import AddNodeToolbar from "@/components/add-node-toolbar"
 import AppSidebar from "@/components/app-sidebar"
 import { ALL_SCORING_BLOCK_TYPES } from "@/lib/scoring-block-types"
-import { saveWorkspace, loadWorkspace } from "@/components/handlers/workspace-save-handlers"
+import { saveWorkspace, loadWorkspace, clearWorkspace } from "@/components/handlers/workspace-save-handlers"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 const firstScoringTab = createScoringPromptTab()
 
@@ -146,6 +157,17 @@ export default function PromptWorkspace() {
     }
   }, [saveCurrentCanvasState, scoringTabs, activeTab, currentScoringTabId, isCallPrompt])
 
+  const handleClear = useCallback(() => {
+    clearWorkspace()
+    flowCanvasRef.current?.setState([], [])
+    const freshTab = createScoringPromptTab()
+    setScoringTabs([freshTab])
+    setCurrentScoringTabId(freshTab.id)
+    setActiveTab("call-prompt")
+    setConversationMessages([])
+    setConversationPrompt("")
+  }, [])
+
   useEffect(() => {
     const saved = loadWorkspace()
     if (!saved) return
@@ -216,6 +238,28 @@ export default function PromptWorkspace() {
             blockTypes={isCallPrompt ? undefined : ALL_SCORING_BLOCK_TYPES}
           />
           <div className="ml-auto flex items-center gap-2">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Trash2 className="size-4" />
+                  Clear
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Clear workspace?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will remove all nodes, edges, and scoring tabs from both canvases and clear any saved data. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleClear}>
+                    Clear everything
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
             <Button variant="outline" size="sm" onClick={handleSave} className="gap-2">
               {isSaved ? <Check className="size-4" /> : <Save className="size-4" />}
               {isSaved ? "Saved!" : "Save"}
