@@ -177,7 +177,7 @@ const Flow = forwardRef<FlowCanvasRef, FlowCanvasProps>(function Flow(
     }
   }, [selectedNodeId, isSectionBlock, nodes, props])
 
-  const handleNodeClick = useCallback(
+  const handleNodeDoubleClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
       setSelectedNodeId(node.id)
       setIsEditorOpen(true)
@@ -283,7 +283,7 @@ const Flow = forwardRef<FlowCanvasRef, FlowCanvasProps>(function Flow(
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
-        onNodeClick={handleNodeClick}
+        onNodeDoubleClick={handleNodeDoubleClick}
         nodeTypes={nodeTypes}
         fitView
       >

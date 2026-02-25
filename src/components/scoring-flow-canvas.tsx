@@ -109,7 +109,7 @@ const ScoringFlow = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
     [screenToFlowPosition, setNodes],
   )
 
-  const handleNodeClick = useCallback(
+  const handleNodeDoubleClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
       setSelectedNodeId(node.id)
       setIsEditorOpen(true)
@@ -271,7 +271,7 @@ const ScoringFlow = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
-        onNodeClick={handleNodeClick}
+        onNodeDoubleClick={handleNodeDoubleClick}
         nodeTypes={nodeTypes}
         fitView
       >
