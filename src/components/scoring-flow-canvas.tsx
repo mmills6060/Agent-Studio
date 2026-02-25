@@ -52,7 +52,7 @@ import {
   type ScoreLevel,
 } from "@/components/handlers/scoring-flow-canvas-handlers"
 import { getScoringBlockType } from "@/lib/scoring-block-types"
-import { parseScoringPrompt } from "@/components/handlers/scoring-prompt-parser"
+import { parseScoringPrompt, parseScoringPromptWithLLM } from "@/components/handlers/scoring-prompt-parser"
 
 interface ScoringFlowCanvasRef {
   getState: () => { nodes: Node<ScoringNodeData>[]; edges: Edge[] }
@@ -82,6 +82,7 @@ const ScoringFlow = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
   const [isImportOpen, setIsImportOpen] = useState(false)
   const [importText, setImportText] = useState("")
   const [importError, setImportError] = useState("")
+  const [isImporting, setIsImporting] = useState(false)
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId) as
     | Node<ScoringNodeData>
@@ -238,21 +239,44 @@ const ScoringFlow = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
     setTimeout(() => setIsCopied(false), 2000)
   }, [generatedPrompt])
 
-  const handleImport = useCallback(() => {
+  const handleImport = useCallback(async () => {
     setImportError("")
+    setIsImporting(true)
+
     try {
-      const { nodes: newNodes, edges: newEdges } = parseScoringPrompt(importText)
-      if (newNodes.length === 0) {
+      const regexResult = parseScoringPrompt(importText)
+
+      if (regexResult.nodes.length > 0) {
+        const hasAttributes = regexResult.nodes.some(
+          (n) => n.data.blockType === "scoring-attribute",
+        )
+        if (hasAttributes) {
+          setNodes(regexResult.nodes)
+          setEdges(regexResult.edges)
+          setImportText("")
+          setIsImportOpen(false)
+          setIsImporting(false)
+          setTimeout(() => fitView({ padding: 0.2 }), 50)
+          return
+        }
+      }
+
+      const llmResult = await parseScoringPromptWithLLM(importText)
+      if (llmResult.nodes.length === 0) {
         setImportError("Could not parse the text. Make sure it contains recognizable scoring prompt sections.")
+        setIsImporting(false)
         return
       }
-      setNodes(newNodes)
-      setEdges(newEdges)
+
+      setNodes(llmResult.nodes)
+      setEdges(llmResult.edges)
       setImportText("")
       setIsImportOpen(false)
       setTimeout(() => fitView({ padding: 0.2 }), 50)
     } catch {
       setImportError("An error occurred while parsing the prompt. Check the format and try again.")
+    } finally {
+      setIsImporting(false)
     }
   }, [importText, setNodes, setEdges, fitView])
 
@@ -614,11 +638,11 @@ const ScoringFlow = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
             </Button>
             <Button
               onClick={handleImport}
-              disabled={!importText.trim()}
+              disabled={!importText.trim() || isImporting}
               className="gap-2"
             >
               <Upload className="size-4" />
-              Import
+              {isImporting ? "Parsing..." : "Import"}
             </Button>
           </DialogFooter>
         </DialogContent>

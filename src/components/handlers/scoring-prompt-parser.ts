@@ -263,4 +263,125 @@ function parseScoringPrompt(text: string): {
   return { nodes: allNodes, edges }
 }
 
-export { parseScoringPrompt }
+interface ParsedScoreLevelJson {
+  value: number
+  description: string
+}
+
+interface ParsedAttributeJson {
+  label: string
+  attribute_key: string
+  max_points: number
+  score_levels: ParsedScoreLevelJson[]
+}
+
+interface ParsedScoringPromptJson {
+  overview?: { label: string; content: string } | null
+  input_contexts?: { label: string; content: string }[]
+  attributes?: ParsedAttributeJson[]
+  scoring_instructions?: string | null
+  evaluator_guardrails?: string | null
+  output_format?: string | null
+}
+
+function convertParsedJsonToNodes(parsed: ParsedScoringPromptJson): {
+  nodes: Node<ScoringNodeData>[]
+  edges: Edge[]
+} {
+  const allNodes: Node<ScoringNodeData>[] = []
+  const topLevelIds: string[] = []
+  let currentX = LAYOUT.baseX
+
+  function addNode(blockType: string, data: Partial<ScoringNodeData>): void {
+    const node = createScoringBlock(blockType, { x: currentX, y: LAYOUT.baseY })
+    Object.assign(node.data, data)
+    allNodes.push(node)
+    topLevelIds.push(node.id)
+    currentX += LAYOUT.blockWidth + LAYOUT.horizontalGap
+  }
+
+  if (parsed.overview) {
+    addNode("indicator-overview", {
+      label: parsed.overview.label || "Indicator Overview",
+      content: parsed.overview.content,
+    })
+  }
+
+  if (parsed.input_contexts) {
+    for (const ctx of parsed.input_contexts) {
+      addNode("input-context", {
+        label: ctx.label || "Input Context",
+        content: ctx.content,
+      })
+    }
+  }
+
+  if (parsed.attributes) {
+    for (const attr of parsed.attributes) {
+      const scoreLevels: ScoreLevel[] = (attr.score_levels ?? [])
+        .map((sl) => ({
+          value: sl.value,
+          description: sl.description,
+          examples: [],
+        }))
+        .sort((a, b) => b.value - a.value)
+
+      addNode("scoring-attribute", {
+        label: attr.label,
+        maxPoints: attr.max_points,
+        attributeKey: attr.attribute_key,
+        scoreLevels,
+      })
+    }
+  }
+
+  if (parsed.scoring_instructions) {
+    addNode("scoring-instructions", {
+      content: parsed.scoring_instructions,
+    })
+  }
+
+  if (parsed.evaluator_guardrails) {
+    addNode("evaluator-guardrails", {
+      content: parsed.evaluator_guardrails,
+    })
+  }
+
+  if (parsed.output_format) {
+    addNode("output-format", {
+      content: parsed.output_format,
+    })
+  }
+
+  const edges: Edge[] = []
+  for (let i = 0; i < topLevelIds.length - 1; i++) {
+    edges.push({
+      id: `edge-${topLevelIds[i]}-${topLevelIds[i + 1]}`,
+      source: topLevelIds[i],
+      target: topLevelIds[i + 1],
+    })
+  }
+
+  return { nodes: allNodes, edges }
+}
+
+async function parseScoringPromptWithLLM(text: string): Promise<{
+  nodes: Node<ScoringNodeData>[]
+  edges: Edge[]
+}> {
+  const response = await fetch("/api/parse-scoring-prompt", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt: text }),
+  })
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: "Request failed" }))
+    throw new Error(err.error ?? "Failed to parse scoring prompt")
+  }
+
+  const data = await response.json()
+  return convertParsedJsonToNodes(data.parsed as ParsedScoringPromptJson)
+}
+
+export { parseScoringPrompt, parseScoringPromptWithLLM, convertParsedJsonToNodes }
