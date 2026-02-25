@@ -12,6 +12,7 @@ interface AppSidebarProps {
   onFinishRename: () => void
   onEditingNameChange: (name: string) => void
   onRenameKeyDown: (e: React.KeyboardEvent) => void
+  onReorderScoringTabs: (activeId: string, overId: string) => void
 }
 
 export type { AppSidebarProps }

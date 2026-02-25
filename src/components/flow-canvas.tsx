@@ -15,10 +15,17 @@ import {
   type Edge,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
-import { forwardRef, useCallback, useImperativeHandle, useState } from "react"
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react"
 import { Copy, Check, Plus, Upload, Sparkles } from "lucide-react"
 import CustomNode from "@/components/custom-node"
 import SectionNode from "@/components/section-node"
+import NodeContextMenu from "@/components/node-context-menu"
+import {
+  copyNodes,
+  generatePastedNodes,
+  hasClipboardData,
+  getClipboardType,
+} from "@/components/handlers/clipboard-handlers"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -83,6 +90,17 @@ const Flow = forwardRef<FlowCanvasRef, FlowCanvasProps>(function Flow(
   const [importText, setImportText] = useState("")
   const [hasNoQuestions, setHasNoQuestions] = useState(false)
   const [isGeneratingScoring, setIsGeneratingScoring] = useState(false)
+  const [contextMenu, setContextMenu] = useState<{
+    x: number
+    y: number
+    nodeId: string | null
+    nodeType: string | null
+  } | null>(null)
+
+  const nodesRef = useRef(nodes)
+  nodesRef.current = nodes
+  const edgesRef = useRef(edges)
+  edgesRef.current = edges
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId) as
     | Node<CustomNodeData>
@@ -230,6 +248,196 @@ const Flow = forwardRef<FlowCanvasRef, FlowCanvasProps>(function Flow(
     [selectedNodeId, setNodes],
   )
 
+  const handleNodeContextMenu = useCallback(
+    (event: React.MouseEvent, node: Node) => {
+      event.preventDefault()
+      setContextMenu({
+        x: event.clientX,
+        y: event.clientY,
+        nodeId: node.id,
+        nodeType: (node.data as CustomNodeData).blockType,
+      })
+    },
+    [],
+  )
+
+  const handlePaneContextMenu = useCallback(
+    (event: React.MouseEvent | MouseEvent) => {
+      event.preventDefault()
+      setContextMenu({
+        x: event.clientX,
+        y: event.clientY,
+        nodeId: null,
+        nodeType: null,
+      })
+    },
+    [],
+  )
+
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenu(null)
+  }, [])
+
+  const handleCopyNode = useCallback(() => {
+    const selected = nodes.filter((n) => n.selected)
+    const nodeIds =
+      selected.length > 0 && selected.some((n) => n.id === contextMenu?.nodeId)
+        ? selected.map((n) => n.id)
+        : contextMenu?.nodeId
+          ? [contextMenu.nodeId]
+          : []
+
+    if (nodeIds.length === 0) return
+    copyNodes(nodeIds, nodes as Node<CustomNodeData>[], edges)
+  }, [nodes, edges, contextMenu])
+
+  const handlePasteNode = useCallback(() => {
+    const pos = contextMenu
+      ? screenToFlowPosition({ x: contextMenu.x, y: contextMenu.y })
+      : screenToFlowPosition({
+          x: window.innerWidth / 2,
+          y: window.innerHeight / 2,
+        })
+
+    const result = generatePastedNodes(pos, nodes as Node<CustomNodeData>[])
+    if (!result) return
+
+    setNodes((nds) => [...nds, ...result.nodes])
+    setEdges((eds) => [...eds, ...result.edges])
+  }, [contextMenu, screenToFlowPosition, nodes, setNodes, setEdges])
+
+  const handlePasteIntoSection = useCallback(() => {
+    if (!contextMenu?.nodeId) return
+
+    const result = generatePastedNodes(
+      { x: 0, y: 0 },
+      nodes as Node<CustomNodeData>[],
+      contextMenu.nodeId,
+    )
+    if (!result) return
+
+    const existingChildren = nodes
+      .filter((n) => n.parentId === contextMenu.nodeId)
+      .sort((a, b) => a.position.y - b.position.y)
+    const lastChild = existingChildren[existingChildren.length - 1]
+    const firstPasted = result.nodes[0]
+
+    setNodes((nds) => [...nds, ...result.nodes])
+    setEdges((eds) => {
+      let updated = [...eds, ...result.edges]
+      if (lastChild && firstPasted) {
+        updated = addEdge(
+          { source: lastChild.id, target: firstPasted.id },
+          updated,
+        )
+      }
+      return updated
+    })
+  }, [contextMenu, nodes, setNodes, setEdges])
+
+  const handleDeleteNode = useCallback(() => {
+    const nodeId = contextMenu?.nodeId
+    if (!nodeId) return
+
+    const idsToDelete = new Set<string>([nodeId])
+    const nodeToDelete = nodes.find((n) => n.id === nodeId)
+    if (nodeToDelete?.data.blockType === "section") {
+      for (const n of nodes) {
+        if (n.parentId === nodeId) idsToDelete.add(n.id)
+      }
+    }
+
+    setNodes((nds) => nds.filter((n) => !idsToDelete.has(n.id)))
+    setEdges((eds) =>
+      eds.filter(
+        (e) => !idsToDelete.has(e.source) && !idsToDelete.has(e.target),
+      ),
+    )
+  }, [contextMenu, nodes, setNodes, setEdges])
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
+      )
+        return
+
+      const isModKey = e.metaKey || e.ctrlKey
+
+      if (isModKey && e.key === "c") {
+        const selected = nodesRef.current.filter((n) => n.selected)
+        if (selected.length === 0) return
+        e.preventDefault()
+        copyNodes(
+          selected.map((n) => n.id),
+          nodesRef.current as Node<CustomNodeData>[],
+          edgesRef.current,
+        )
+      }
+
+      if (isModKey && e.key === "v") {
+        if (!hasClipboardData()) return
+        e.preventDefault()
+
+        const clipType = getClipboardType()
+        if (clipType === "question") {
+          const selectedSection = nodesRef.current.find(
+            (n) =>
+              n.selected &&
+              (n.data as CustomNodeData).blockType === "section",
+          )
+          if (!selectedSection) return
+
+          const result = generatePastedNodes(
+            { x: 0, y: 0 },
+            nodesRef.current as Node<CustomNodeData>[],
+            selectedSection.id,
+          )
+          if (!result) return
+
+          const existingChildren = nodesRef.current
+            .filter((n) => n.parentId === selectedSection.id)
+            .sort((a, b) => a.position.y - b.position.y)
+          const lastChild = existingChildren[existingChildren.length - 1]
+          const firstPasted = result.nodes[0]
+
+          setNodes((nds) => [...nds, ...result.nodes])
+          setEdges((eds) => {
+            let updated = [...eds, ...result.edges]
+            if (lastChild && firstPasted) {
+              updated = addEdge(
+                { source: lastChild.id, target: firstPasted.id },
+                updated,
+              )
+            }
+            return updated
+          })
+          return
+        }
+
+        const position = screenToFlowPosition({
+          x: window.innerWidth / 2 + (Math.random() - 0.5) * 100,
+          y: window.innerHeight / 2 + (Math.random() - 0.5) * 100,
+        })
+        const result = generatePastedNodes(
+          position,
+          nodesRef.current as Node<CustomNodeData>[],
+        )
+        if (!result) return
+        setNodes((nds) => [...nds, ...result.nodes])
+        setEdges((eds) => [...eds, ...result.edges])
+      }
+
+      if (e.key === "Escape") setContextMenu(null)
+    }
+
+    document.addEventListener("keydown", handleKeyDown)
+    return () => document.removeEventListener("keydown", handleKeyDown)
+  }, [screenToFlowPosition, setNodes, setEdges])
+
   const handleRun = useCallback(() => {
     const prompt = generateSystemPrompt(
       nodes as Node<CustomNodeData>[],
@@ -284,6 +492,9 @@ const Flow = forwardRef<FlowCanvasRef, FlowCanvasProps>(function Flow(
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeDoubleClick={handleNodeDoubleClick}
+        onNodeContextMenu={handleNodeContextMenu}
+        onPaneContextMenu={handlePaneContextMenu}
+        onPaneClick={handleCloseContextMenu}
         nodeTypes={nodeTypes}
         fitView
       >
@@ -291,6 +502,22 @@ const Flow = forwardRef<FlowCanvasRef, FlowCanvasProps>(function Flow(
         <Controls />
         <MiniMap />
       </ReactFlow>
+
+      {contextMenu && (
+        <NodeContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          nodeId={contextMenu.nodeId}
+          nodeType={contextMenu.nodeType}
+          isClipboardFilled={hasClipboardData()}
+          clipboardType={getClipboardType()}
+          onCopy={handleCopyNode}
+          onPaste={handlePasteNode}
+          onPasteIntoSection={handlePasteIntoSection}
+          onDelete={handleDeleteNode}
+          onClose={handleCloseContextMenu}
+        />
+      )}
 
       <Sheet open={isEditorOpen} onOpenChange={setIsEditorOpen}>
         <SheetContent className="flex flex-col">

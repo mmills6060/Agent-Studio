@@ -122,6 +122,18 @@ export default function PromptWorkspace() {
     [handleFinishRename],
   )
 
+  const handleReorderScoringTabs = useCallback((activeId: string, overId: string) => {
+    setScoringTabs((prev) => {
+      const oldIndex = prev.findIndex((t) => t.id === activeId)
+      const newIndex = prev.findIndex((t) => t.id === overId)
+      if (oldIndex === -1 || newIndex === -1) return prev
+      const updated = [...prev]
+      const [moved] = updated.splice(oldIndex, 1)
+      updated.splice(newIndex, 0, moved)
+      return updated
+    })
+  }, [])
+
   const handleOpenConversation = useCallback(() => {
     const prompt = flowCanvasRef.current?.getPrompt() ?? ""
     setConversationPrompt(prompt)
@@ -228,10 +240,15 @@ export default function PromptWorkspace() {
         onFinishRename={handleFinishRename}
         onEditingNameChange={setEditingName}
         onRenameKeyDown={handleRenameKeyDown}
+        onReorderScoringTabs={handleReorderScoringTabs}
       />
       <SidebarInset>
         <header className="flex h-10 items-center gap-2 px-2">
           <SidebarTrigger />
+          <Separator orientation="vertical" className="h-4" />
+          <span className="text-sm font-medium truncate">
+            {isCallPrompt ? "Call Prompt" : scoringTabToRender?.name ?? "Scoring Prompt"}
+          </span>
           <Separator orientation="vertical" className="h-4" />
           <AddNodeToolbar
             onAddBlock={handleAddBlock}
