@@ -69,6 +69,13 @@ const LAYOUT = {
   horizontalGap: 80,
 } as const
 
+function formatPossibleValues(levels: { value: number }[]): string {
+  const sorted = [...levels].sort((a, b) => a.value - b.value)
+  const values = sorted.map((l) => String(l.value))
+  if (values.length <= 2) return values.join(" or ")
+  return values.slice(0, -1).join(", ") + ", or " + values[values.length - 1]
+}
+
 function buildScoringNodesFromSection(
   sectionContent: SectionContent,
   attributeKeys?: string[],
@@ -99,11 +106,20 @@ function buildScoringNodesFromSection(
   })
 
   const resolvedKeys: string[] = []
+  const resolvedLevels: { value: number }[][] = []
 
   for (let i = 0; i < questions.length; i++) {
     const q = questions[i]
     const attrKey = attributeKeys?.[i] ?? toSnakeCase(q.label)
     resolvedKeys.push(attrKey)
+
+    const scoreLevels = [
+      { value: 3, description: "Comprehensive, well-structured response demonstrating strong understanding", examples: [] as string[] },
+      { value: 2, description: "Adequate response covering key points with minor gaps", examples: [] as string[] },
+      { value: 1, description: "Partial response with significant gaps or lack of depth", examples: [] as string[] },
+      { value: 0, description: "No meaningful response or completely off-topic", examples: [] as string[] },
+    ]
+    resolvedLevels.push(scoreLevels)
 
     addNode("scoring-attribute", {
       label: q.label,
@@ -114,28 +130,21 @@ function buildScoringNodesFromSection(
         ? `Evaluate the candidate's response to: "${q.question}"\n\nFollow-up context: ${q.followUpStrategy}`
         : `Evaluate the candidate's response to: "${q.question}"`,
       attributeKey: attrKey,
-      scoreLevels: [
-        { value: 3, description: "Comprehensive, well-structured response demonstrating strong understanding", examples: [] },
-        { value: 2, description: "Adequate response covering key points with minor gaps", examples: [] },
-        { value: 1, description: "Partial response with significant gaps or lack of depth", examples: [] },
-        { value: 0, description: "No meaningful response or completely off-topic", examples: [] },
-      ],
+      scoreLevels,
     })
   }
 
-  const maxTotal = questions.length * 3
   const instructionLines = [
     "1. Read the full conversation transcript carefully",
     "2. For each scoring attribute, identify relevant candidate responses",
     "3. Compare responses against the scoring scale",
     "4. Assign a score for each attribute based on the evidence",
-    "5. Calculate the total score",
-    "6. Provide specific feedback citing transcript evidence",
+    "5. Write a brief rationale summarizing key observations from the transcript",
     "",
     "Score each attribute independently:",
   ]
-  resolvedKeys.forEach((key) => {
-    instructionLines.push(`"${key}": <0 or 1 or 2 or 3>`)
+  resolvedKeys.forEach((key, i) => {
+    instructionLines.push(`"${key}": <${formatPossibleValues(resolvedLevels[i])}>`)
   })
 
   addNode("scoring-instructions", {
@@ -155,13 +164,14 @@ function buildScoringNodesFromSection(
     ].join("\n"),
   })
 
-  const outputFields = resolvedKeys
-    .map((key) => `  "${key}": <0 or 1 or 2 or 3>`)
-    .join(",\n")
+  const labelList = questions.map((q) => q.label.toLowerCase()).join(" and ")
+  const attributeFields = resolvedKeys
+    .map((key, i) => `"${key}": <${formatPossibleValues(resolvedLevels[i])}>`)
+    .join(", ")
 
   addNode("output-format", {
     label: "Output Format",
-    content: `{\n${outputFields},\n  "total": <0-${maxTotal}>,\n  "feedback": "<detailed feedback with transcript evidence>"\n}`,
+    content: `{"rationale": "<up to 50 words summarizing ${labelList} responses — facts only>", "attribute_scores": {${attributeFields}}}`,
   })
 
   const edges: Edge[] = []

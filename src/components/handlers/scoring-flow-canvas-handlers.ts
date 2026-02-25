@@ -238,7 +238,9 @@ function generateScoringPrompt(
 
 function buildPossibleValuesString(levels: ScoreLevel[]): string {
   const sorted = [...levels].sort((a, b) => a.value - b.value)
-  return sorted.map((l) => String(l.value)).join(" or ")
+  const values = sorted.map((l) => String(l.value))
+  if (values.length <= 2) return values.join(" or ")
+  return values.slice(0, -1).join(", ") + ", or " + values[values.length - 1]
 }
 
 function replaceKeyInContent(
@@ -252,6 +254,65 @@ function replaceKeyInContent(
   const escaped = keyToFind.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
   const pattern = new RegExp(`"${escaped}"\\s*:\\s*<[^>]+>`, "g")
   return content.replace(pattern, `"${newKey}": <${newValues}>`)
+}
+
+function keyExistsInContent(content: string, key: string): boolean {
+  if (!content || !key) return false
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  return new RegExp(`"${escaped}"\\s*:\\s*(<[^>]+>|\\S+)`).test(content)
+}
+
+function addAttributeKeyToContent(
+  content: string,
+  key: string,
+  valuesStr: string,
+  blockType: string,
+): string {
+  if (!content || !key) return content
+
+  const entry = `"${key}": <${valuesStr}>`
+
+  if (blockType === "scoring-instructions")
+    return content.trimEnd() + "\n" + entry
+
+  if (blockType === "output-format") {
+    const lines = content.split("\n")
+    const totalIdx = lines.findIndex(line => /^\s*"total"\s*:/.test(line))
+
+    if (totalIdx !== -1) {
+      lines.splice(totalIdx, 0, `  ${entry},`)
+      return lines.join("\n")
+    }
+
+    for (let i = lines.length - 1; i >= 0; i--) {
+      if (lines[i].trim() === "}") {
+        if (i > 0 && !lines[i - 1].trimEnd().endsWith(","))
+          lines[i - 1] = lines[i - 1].trimEnd() + ","
+        lines.splice(i, 0, `  ${entry}`)
+        return lines.join("\n")
+      }
+    }
+
+    return content.trimEnd() + "\n" + `  ${entry},`
+  }
+
+  return content
+}
+
+function removeAttributeKeyFromContent(content: string, key: string): string {
+  if (!content || !key) return content
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  const lines = content.split("\n")
+  const pattern = new RegExp(`^\\s*"${escaped}"\\s*:\\s*(<[^>]+>|\\S+),?\\s*$`)
+  return lines.filter(line => !pattern.test(line)).join("\n")
+}
+
+function updateOutputFormatTotal(
+  content: string,
+  attributeNodes: Node<ScoringNodeData>[],
+): string {
+  const maxTotal = attributeNodes.reduce((sum, n) => sum + n.data.maxPoints, 0)
+  return content.replace(/"total"\s*:\s*<[^>]+>/, `"total": <0-${maxTotal}>`)
 }
 
 function syncAttributeToRelatedNodes(
@@ -269,17 +330,54 @@ function syncAttributeToRelatedNodes(
   if (levels.length === 0) return nodes
 
   const valuesStr = buildPossibleValuesString(levels)
+  const attributeNodes = nodes.filter(n => n.data.blockType === "scoring-attribute")
 
   return nodes.map((node) => {
     if (node.data.blockType !== "scoring-instructions" && node.data.blockType !== "output-format")
       return node
     if (!node.data.content) return node
 
-    const updated = replaceKeyInContent(node.data.content, oldKey, newKey, valuesStr)
-    if (updated === node.data.content) return node
-    return { ...node, data: { ...node.data, content: updated } }
+    let content = node.data.content
+
+    if (oldKey && keyExistsInContent(content, oldKey)) {
+      content = replaceKeyInContent(content, oldKey, newKey, valuesStr)
+    } else if (!keyExistsInContent(content, newKey)) {
+      content = addAttributeKeyToContent(content, newKey, valuesStr, node.data.blockType)
+    }
+
+    if (node.data.blockType === "output-format")
+      content = updateOutputFormatTotal(content, attributeNodes)
+
+    if (content === node.data.content) return node
+    return { ...node, data: { ...node.data, content } }
   })
 }
 
-export { createScoringBlock, updateScoringNodeData, generateScoringPrompt, syncAttributeToRelatedNodes }
+function syncAfterAttributeRemoval(
+  nodes: Node<ScoringNodeData>[],
+  removedKeys: string[],
+): Node<ScoringNodeData>[] {
+  if (removedKeys.length === 0) return nodes
+
+  const remainingAttributes = nodes.filter(n => n.data.blockType === "scoring-attribute")
+
+  return nodes.map(node => {
+    if (node.data.blockType !== "scoring-instructions" && node.data.blockType !== "output-format")
+      return node
+    if (!node.data.content) return node
+
+    let content = node.data.content
+    for (const key of removedKeys) {
+      content = removeAttributeKeyFromContent(content, key)
+    }
+
+    if (node.data.blockType === "output-format")
+      content = updateOutputFormatTotal(content, remainingAttributes)
+
+    if (content === node.data.content) return node
+    return { ...node, data: { ...node.data, content } }
+  })
+}
+
+export { createScoringBlock, updateScoringNodeData, generateScoringPrompt, syncAttributeToRelatedNodes, syncAfterAttributeRemoval }
 export type { ScoringNodeData, ScoreLevel }

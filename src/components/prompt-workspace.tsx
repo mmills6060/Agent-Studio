@@ -65,10 +65,12 @@ export default function PromptWorkspace() {
     (tabId: string) => {
       if (tabId === activeTab) return
       saveCurrentCanvasState()
+      if (isCallPrompt) flowCanvasRef.current?.deselectAll()
+      else canvasRef.current?.deselectAll()
       if (tabId !== "call-prompt") setCurrentScoringTabId(tabId)
       setActiveTab(tabId)
     },
-    [activeTab, saveCurrentCanvasState],
+    [activeTab, isCallPrompt, saveCurrentCanvasState],
   )
 
   const handleAddScoringTab = useCallback(() => {

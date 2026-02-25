@@ -56,6 +56,7 @@ import {
   buildScoringNodesFromSection,
   generateAttributeKeys,
 } from "@/components/handlers/scoring-prompt-generation-handlers"
+import { generateFollowUpStrategy } from "@/components/handlers/follow-up-strategy-handlers"
 import { getBlockType } from "@/lib/block-types"
 
 interface FlowCanvasRef {
@@ -65,6 +66,7 @@ interface FlowCanvasRef {
   viewPrompt: () => void
   addBlock: (blockType: string) => void
   setState: (nodes: Node<CustomNodeData>[], edges: Edge[]) => void
+  deselectAll: () => void
 }
 
 interface FlowCanvasProps {
@@ -90,6 +92,7 @@ const Flow = forwardRef<FlowCanvasRef, FlowCanvasProps>(function Flow(
   const [importText, setImportText] = useState("")
   const [hasNoQuestions, setHasNoQuestions] = useState(false)
   const [isGeneratingScoring, setIsGeneratingScoring] = useState(false)
+  const [isGeneratingFollowUp, setIsGeneratingFollowUp] = useState(false)
   const [contextMenu, setContextMenu] = useState<{
     x: number
     y: number
@@ -247,6 +250,30 @@ const Flow = forwardRef<FlowCanvasRef, FlowCanvasProps>(function Flow(
     },
     [selectedNodeId, setNodes],
   )
+
+  const handleGenerateFollowUp = useCallback(async () => {
+    if (!selectedNodeId || !isQuestionBlock) return
+
+    setIsGeneratingFollowUp(true)
+    try {
+      const strategy = await generateFollowUpStrategy(
+        nodes as Node<CustomNodeData>[],
+        selectedNodeId,
+      )
+      setNodes(
+        (nds) =>
+          updateNodeData(
+            nds as Node<CustomNodeData>[],
+            selectedNodeId,
+            { followUpStrategy: strategy },
+          ),
+      )
+    } catch {
+      // silently fail — user can retry
+    } finally {
+      setIsGeneratingFollowUp(false)
+    }
+  }, [selectedNodeId, isQuestionBlock, nodes, setNodes])
 
   const handleNodeContextMenu = useCallback(
     (event: React.MouseEvent, node: Node) => {
@@ -458,6 +485,9 @@ const Flow = forwardRef<FlowCanvasRef, FlowCanvasProps>(function Flow(
       setEdges(newEdges)
       setTimeout(() => fitView({ padding: 0.2 }), 50)
     },
+    deselectAll: () => {
+      setNodes(nds => nds.map(n => n.selected ? { ...n, selected: false } : n))
+    },
   }), [nodes, edges, handleRun, handleAddBlock, setNodes, setEdges, fitView])
 
   const handleCopyPrompt = useCallback(async () => {
@@ -579,6 +609,16 @@ const Flow = forwardRef<FlowCanvasRef, FlowCanvasProps>(function Flow(
                     placeholder="Describe how to follow up based on the candidate's response..."
                     className="min-h-[120px]"
                   />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleGenerateFollowUp}
+                    disabled={isGeneratingFollowUp || !selectedNode?.data.content?.trim()}
+                    className="gap-2 self-start"
+                  >
+                    <Sparkles className={`size-4 ${isGeneratingFollowUp ? "animate-spin" : ""}`} />
+                    {isGeneratingFollowUp ? "Generating..." : "Generate Follow Up Strategy"}
+                  </Button>
                 </div>
               </>
             ) : (

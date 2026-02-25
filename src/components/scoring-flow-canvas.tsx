@@ -13,6 +13,7 @@ import {
   type OnConnect,
   type Node,
   type Edge,
+  type NodeChange,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from "react"
@@ -48,6 +49,7 @@ import {
   updateScoringNodeData,
   generateScoringPrompt,
   syncAttributeToRelatedNodes,
+  syncAfterAttributeRemoval,
   type ScoringNodeData,
   type ScoreLevel,
 } from "@/components/handlers/scoring-flow-canvas-handlers"
@@ -59,6 +61,7 @@ interface ScoringFlowCanvasRef {
   openImport: () => void
   viewPrompt: () => void
   addBlock: (blockType: string) => void
+  deselectAll: () => void
 }
 
 interface ScoringFlowProps {
@@ -93,6 +96,25 @@ const ScoringFlow = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
   const onConnect: OnConnect = useCallback(
     (connection) => setEdges((eds) => addEdge(connection, eds)),
     [setEdges],
+  )
+
+  const handleNodesChange = useCallback(
+    (changes: NodeChange<Node<ScoringNodeData>>[]) => {
+      const removedAttributeKeys: string[] = []
+      for (const change of changes) {
+        if (change.type === "remove") {
+          const node = nodes.find(n => n.id === change.id)
+          if (node?.data.blockType === "scoring-attribute" && node.data.attributeKey)
+            removedAttributeKeys.push(node.data.attributeKey)
+        }
+      }
+
+      onNodesChange(changes)
+
+      if (removedAttributeKeys.length > 0)
+        setNodes(nds => syncAfterAttributeRemoval(nds as Node<ScoringNodeData>[], removedAttributeKeys))
+    },
+    [nodes, onNodesChange, setNodes],
   )
 
   const handleAddBlock = useCallback(
@@ -231,7 +253,10 @@ const ScoringFlow = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
     openImport: handleOpenImport,
     viewPrompt: handleRun,
     addBlock: handleAddBlock,
-  }), [nodes, edges, handleRun, handleAddBlock, handleOpenImport])
+    deselectAll: () => {
+      setNodes(nds => nds.map(n => n.selected ? { ...n, selected: false } : n))
+    },
+  }), [nodes, edges, handleRun, handleAddBlock, handleOpenImport, setNodes])
 
   const handleCopyPrompt = useCallback(async () => {
     await navigator.clipboard.writeText(generatedPrompt)
@@ -292,7 +317,7 @@ const ScoringFlow = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
       <ReactFlow
         nodes={nodes}
         edges={edges}
-        onNodesChange={onNodesChange}
+        onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeDoubleClick={handleNodeDoubleClick}
