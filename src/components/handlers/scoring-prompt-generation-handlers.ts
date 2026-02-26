@@ -1,5 +1,5 @@
 import type { Node, Edge } from "@xyflow/react"
-import type { CustomNodeData } from "./flow-canvas-handlers"
+import { coerceToString, type CustomNodeData } from "./flow-canvas-handlers"
 import { createScoringBlock, type ScoringNodeData } from "./scoring-flow-canvas-handlers"
 
 interface SectionContent {
@@ -24,7 +24,7 @@ function collectSectionContent(
     .map((c) => ({
       label: c.data.label?.trim() || "Question",
       question: c.data.content.trim(),
-      followUpStrategy: c.data.followUpStrategy?.trim() ?? "",
+      followUpStrategy: coerceToString(c.data.followUpStrategy).trim(),
     }))
 
   return {

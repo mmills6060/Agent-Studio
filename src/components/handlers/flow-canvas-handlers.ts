@@ -10,6 +10,12 @@ interface CustomNodeData {
   [key: string]: unknown
 }
 
+function coerceToString(value: unknown): string {
+  if (typeof value === "string") return value
+  if (Array.isArray(value)) return value.join("\n")
+  return String(value ?? "")
+}
+
 let nodeIdCounter = 0
 
 function createTypedBlock(
@@ -179,7 +185,7 @@ function formatNodeOutput(
 
     for (const child of children) {
       const questionText = child.data.content?.trim()
-      const followUp = child.data.followUpStrategy?.trim()
+      const followUp = coerceToString(child.data.followUpStrategy).trim()
 
       if (questionText) parts.push(`[CURRENT QUESTION]\n"${questionText}"`)
       if (followUp) parts.push(`[FOLLOW-UP STRATEGY]\n${followUp}`)
@@ -193,5 +199,5 @@ function formatNodeOutput(
   return `${tag}\n${content}`
 }
 
-export { createTypedBlock, updateNodeData, generateSystemPrompt }
+export { createTypedBlock, updateNodeData, generateSystemPrompt, coerceToString }
 export type { CustomNodeData }

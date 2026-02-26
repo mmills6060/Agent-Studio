@@ -17,7 +17,7 @@ import {
   type ScoringPromptTab,
 } from "@/components/handlers/scoring-prompt-manager-handlers"
 import type { ScoringNodeData } from "@/components/handlers/scoring-flow-canvas-handlers"
-import { Play, Upload, MessageSquare, BarChart3, Save, Check, Trash2 } from "lucide-react"
+import { Play, Upload, MessageSquare, BarChart3, Save, Check, Trash2, Wand2 } from "lucide-react"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
@@ -25,6 +25,8 @@ import AddNodeToolbar from "@/components/add-node-toolbar"
 import AppSidebar from "@/components/app-sidebar"
 import { ALL_SCORING_BLOCK_TYPES } from "@/lib/scoring-block-types"
 import { saveWorkspace, loadWorkspace, clearWorkspace } from "@/components/handlers/workspace-save-handlers"
+import PromptWizard from "@/components/prompt-wizard"
+import type { WizardResult } from "@/components/handlers/prompt-wizard-handlers"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,6 +51,7 @@ export default function PromptWorkspace() {
   const [conversationPrompt, setConversationPrompt] = useState("")
   const [conversationMessages, setConversationMessages] = useState<ConversationMessage[]>([])
   const [isScoringResultsOpen, setIsScoringResultsOpen] = useState(false)
+  const [isWizardOpen, setIsWizardOpen] = useState(false)
   const canvasRef = useRef<ScoringFlowCanvasRef>(null)
   const flowCanvasRef = useRef<FlowCanvasRef>(null)
 
@@ -228,6 +231,31 @@ export default function PromptWorkspace() {
     [saveCurrentCanvasState],
   )
 
+  const handleWizardComplete = useCallback(
+    (result: WizardResult) => {
+      flowCanvasRef.current?.setState(
+        result.callPrompt.nodes,
+        result.callPrompt.edges,
+      )
+
+      const newTabs: ScoringPromptTab[] = []
+      for (const scoring of result.scoringPrompts) {
+        const tab = createScoringPromptTab(scoring.tabName)
+        tab.nodes = scoring.nodes
+        tab.edges = scoring.edges
+        newTabs.push(tab)
+      }
+
+      if (newTabs.length > 0) {
+        setScoringTabs(newTabs)
+        setCurrentScoringTabId(newTabs[0].id)
+      }
+
+      setActiveTab("call-prompt")
+    },
+    [],
+  )
+
   return (
     <SidebarProvider>
       <AppSidebar
@@ -283,6 +311,10 @@ export default function PromptWorkspace() {
               {isSaved ? <Check className="size-4" /> : <Save className="size-4" />}
               {isSaved ? "Saved!" : "Save"}
             </Button>
+            <Button variant="outline" size="sm" onClick={() => setIsWizardOpen(true)} className="gap-2">
+              <Wand2 className="size-4" />
+              Wizard
+            </Button>
             <Button variant="outline" size="sm" onClick={handleImport} className="gap-2">
               <Upload className="size-4" />
               Import
@@ -331,6 +363,12 @@ export default function PromptWorkspace() {
           scoringTabs={scoringTabs}
           activeTabId={activeTab}
           conversationMessages={conversationMessages}
+        />
+
+        <PromptWizard
+          isOpen={isWizardOpen}
+          onOpenChange={setIsWizardOpen}
+          onComplete={handleWizardComplete}
         />
       </SidebarInset>
     </SidebarProvider>
