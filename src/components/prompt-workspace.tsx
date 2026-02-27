@@ -461,6 +461,7 @@ export default function PromptWorkspace() {
           isOpen={isConversationOpen}
           onOpenChange={setIsConversationOpen}
           callPrompt={conversationPrompt}
+          contextResult={contextRunResult}
           onMessagesChange={setConversationMessages}
         />
 

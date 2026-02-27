@@ -27,6 +27,7 @@ interface ConversationPanelProps {
   isOpen: boolean
   onOpenChange: (open: boolean) => void
   callPrompt: string
+  contextResult?: string | null
   onMessagesChange?: (messages: ConversationMessage[]) => void
 }
 
@@ -34,6 +35,7 @@ export default function ConversationPanel({
   isOpen,
   onOpenChange,
   callPrompt,
+  contextResult,
   onMessagesChange,
 }: ConversationPanelProps) {
   const [state, setState] = useState<ConversationState>(createInitialState(100))
@@ -68,6 +70,10 @@ export default function ConversationPanel({
       return
     }
 
+    const effectivePrompt = contextResult?.trim()
+      ? `${callPrompt}\n\n--- Context Prompt Output ---\n${contextResult}`
+      : callPrompt
+
     const controller = new AbortController()
     abortRef.current = controller
     const candidateSystemPrompt = buildCandidateSystemPrompt(candidatePrompt)
@@ -90,7 +96,7 @@ export default function ConversationPanel({
         setActiveAgent("interviewer")
         const interviewerHistory = formatHistoryForAgent(messages, "interviewer")
         const interviewerMsg = await fetchAgentResponse(
-          callPrompt,
+          effectivePrompt,
           interviewerHistory,
           "interviewer",
           controller.signal,
@@ -135,7 +141,7 @@ export default function ConversationPanel({
       setActiveAgent(null)
       abortRef.current = null
     }
-  }, [callPrompt, candidatePrompt, maxTurns])
+  }, [callPrompt, contextResult, candidatePrompt, maxTurns])
 
   const handleStop = useCallback(() => {
     abortRef.current?.abort()
