@@ -8,7 +8,7 @@ import {
   type Node,
 } from "@xyflow/react"
 import { LayoutList } from "lucide-react"
-import type { CustomNodeData } from "@/components/handlers/flow-canvas-handlers"
+import { coerceToString, type CustomNodeData } from "@/components/handlers/flow-canvas-handlers"
 
 type SectionNodeType = Node<CustomNodeData, "section">
 
@@ -33,9 +33,9 @@ function SectionNode({ data, selected }: NodeProps<SectionNodeType>) {
           {data.label}
         </span>
       </div>
-      {data.content?.trim() && (
+      {coerceToString(data.content).trim() && (
         <p className="mx-4 mt-2 line-clamp-2 text-xs text-muted-foreground">
-          {data.content}
+          {coerceToString(data.content)}
         </p>
       )}
       <div className="flex-1" />

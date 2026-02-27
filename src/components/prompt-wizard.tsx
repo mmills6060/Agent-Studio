@@ -335,10 +335,10 @@ export default function PromptWizard({
               <div className="rounded-md border p-4">
                 <h4 className="text-sm font-medium text-foreground mb-2">What will be generated</h4>
                 <ul className="space-y-1.5 text-sm text-muted-foreground">
-                  <li>Call prompt with Persona, Job Info, Rules, and {categories.length} section{categories.length !== 1 ? "s" : ""}</li>
-                  <li>{totalQuestions} interview question{totalQuestions !== 1 ? "s" : ""} with AI-generated follow-up strategies</li>
-                  <li>{categories.length} scoring prompt tab{categories.length !== 1 ? "s" : ""} with scoring attributes</li>
-                  <li>AI-generated score level descriptions based on your scoring guidance</li>
+                  <li>Persona and Job Info blocks with your interviewer, company, and role details</li>
+                  <li>Rules, Instructions, FAQ, and Global Constraint blocks with standard content</li>
+                  <li>{categories.length} section{categories.length !== 1 ? "s" : ""} with {totalQuestions} interview question{totalQuestions !== 1 ? "s" : ""} and AI-generated follow-up strategies</li>
+                  <li>{categories.length} scoring prompt tab{categories.length !== 1 ? "s" : ""} with AI-generated score level descriptions</li>
                 </ul>
               </div>
 

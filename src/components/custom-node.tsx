@@ -2,7 +2,7 @@
 
 import { Handle, Position, type NodeProps, type Node } from "@xyflow/react"
 import { MessageSquare } from "lucide-react"
-import type { CustomNodeData } from "@/components/handlers/flow-canvas-handlers"
+import { coerceToString, type CustomNodeData } from "@/components/handlers/flow-canvas-handlers"
 import { getBlockType } from "@/lib/block-types"
 
 type CustomNodeType = Node<CustomNodeData, "custom">
@@ -19,7 +19,8 @@ const accentColorMap: Record<string, string> = {
 }
 
 function CustomNode({ data, selected }: NodeProps<CustomNodeType>) {
-  const hasContent = data.content?.trim().length > 0
+  const contentStr = coerceToString(data.content)
+  const hasContent = contentStr.trim().length > 0
   const config = getBlockType(data.blockType)
   const Icon = config?.icon ?? MessageSquare
   const accentClass = config
@@ -43,7 +44,7 @@ function CustomNode({ data, selected }: NodeProps<CustomNodeType>) {
       </div>
       {hasContent && (
         <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">
-          {data.content}
+          {contentStr}
         </p>
       )}
       <Handle

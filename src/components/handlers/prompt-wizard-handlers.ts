@@ -24,9 +24,6 @@ interface WizardConfig {
 }
 
 interface WizardGeneratedContent {
-  persona: string
-  jobInfo: string
-  rules: string
   categories: {
     name: string
     systemInstruction: string
@@ -171,6 +168,16 @@ const CALL_LAYOUT = {
   minSectionHeight: 400,
 } as const
 
+function substituteWizardValues(
+  template: string,
+  config: WizardConfig,
+): string {
+  return template
+    .replaceAll("Melissa", config.interviewerName)
+    .replaceAll("Affordable Care", config.companyName)
+    .replaceAll("Front Desk Assistant", config.roleTitle)
+}
+
 function buildCallPromptNodes(
   config: WizardConfig,
   content: WizardGeneratedContent,
@@ -179,18 +186,22 @@ function buildCallPromptNodes(
   const topLevelIds: string[] = []
   let currentX = CALL_LAYOUT.baseX
 
-  function addSimpleBlock(blockType: string, text: string, label?: string) {
+  function addBlock(blockType: string) {
     const node = createTypedBlock(blockType, { x: currentX, y: CALL_LAYOUT.baseY })
-    node.data.content = text
-    if (label) node.data.label = label
     allNodes.push(node)
     topLevelIds.push(node.id)
     currentX += CALL_LAYOUT.simpleBlockWidth + CALL_LAYOUT.horizontalGap
+    return node
   }
 
-  addSimpleBlock("persona", content.persona)
-  addSimpleBlock("job-info", content.jobInfo)
-  addSimpleBlock("rules", content.rules)
+  const personaNode = addBlock("persona")
+  personaNode.data.content = substituteWizardValues(personaNode.data.content, config)
+
+  const jobInfoNode = addBlock("job-info")
+  jobInfoNode.data.content = substituteWizardValues(jobInfoNode.data.content, config)
+
+  addBlock("rules")
+  addBlock("instructions")
 
   for (let ci = 0; ci < config.categories.length; ci++) {
     const cat = config.categories[ci]
@@ -235,6 +246,9 @@ function buildCallPromptNodes(
 
     currentX += CALL_LAYOUT.sectionWidth + CALL_LAYOUT.horizontalGap
   }
+
+  addBlock("faq")
+  addBlock("global-constraint")
 
   const edges: Edge[] = []
 

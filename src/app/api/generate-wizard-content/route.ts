@@ -63,13 +63,10 @@ export async function POST(request: Request) {
     })
     .join("\n\n")
 
-  const systemPrompt = `You are an expert interview prompt designer. Given interview metadata and a structured set of categories with questions, generate all the content needed for a complete AI phone screen interview prompt.
+  const systemPrompt = `You are an expert interview prompt designer. Given interview metadata and a structured set of categories with questions, generate the per-category content needed for an AI phone screen interview prompt.
 
 You must respond with valid JSON matching this exact structure:
 {
-  "persona": "<persona description for the AI interviewer>",
-  "jobInfo": "<job information text>",
-  "rules": "<interview rules and guidelines>",
   "categories": [
     {
       "name": "<category name>",
@@ -90,12 +87,6 @@ You must respond with valid JSON matching this exact structure:
 
 Guidelines for each field:
 
-PERSONA: Write a professional persona for an AI interviewer named "${interviewerName}" at "${companyName}". The persona should be warm, professional, and set the tone for a phone screen interview. Include the interviewer's name, company, and their role in the interview process. Keep it to 3-5 sentences.
-
-JOB INFO: Write a concise job information block for the "${roleTitle}" role at "${companyName}". Describe what the role involves based on the interview categories and questions provided. Keep it to 2-4 sentences.
-
-RULES: Write 5-8 clear rules for the AI interviewer to follow during the phone screen. Rules should cover: maintaining professional tone, time management, not providing answers, handling off-topic responses, being encouraging but neutral, and transitioning between sections.
-
 SYSTEM INSTRUCTION (per category): Write a brief (1-2 sentence) instruction telling the AI what this section evaluates and how to approach it.
 
 FOLLOW-UP STRATEGY (per question): Write 2-5 bullet points describing how to follow up based on candidate responses. Use conditional language like "If yes:", "If vague:", etc. Be specific to the question content.
@@ -112,7 +103,7 @@ Respond with ONLY the JSON object. No markdown, no explanation.`
 Categories and Questions:
 ${categorySummary}
 
-Generate the complete interview prompt content.`
+Generate the per-category content (system instructions, follow-up strategies, and score levels).`
 
   try {
     const openai = new OpenAI({ apiKey })
@@ -138,7 +129,7 @@ Generate the complete interview prompt content.`
       )
     }
 
-    if (!result.persona || !result.categories)
+    if (!result.categories)
       return NextResponse.json(
         { error: "LLM response missing required fields" },
         { status: 502 },

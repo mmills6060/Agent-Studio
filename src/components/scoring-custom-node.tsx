@@ -3,6 +3,7 @@
 import { Handle, Position, type NodeProps, type Node } from "@xyflow/react"
 import { MessageSquare } from "lucide-react"
 import type { ScoringNodeData } from "@/components/handlers/scoring-flow-canvas-handlers"
+import { coerceToString } from "@/components/handlers/flow-canvas-handlers"
 import { getScoringBlockType } from "@/lib/scoring-block-types"
 
 type ScoringCustomNodeType = Node<ScoringNodeData, "scoring-custom">
@@ -31,7 +32,7 @@ function ScoringCustomNode({ data, selected }: NodeProps<ScoringCustomNodeType>)
     ? hasScoreLevels
       ? scoreLevels.map((l) => String(l.value)).join(" / ")
       : data.goal?.trim()
-    : data.content?.trim()
+    : coerceToString(data.content).trim() || undefined
 
   return (
     <div
