@@ -20,7 +20,7 @@ import {
 } from "@/components/handlers/scoring-prompt-manager-handlers"
 import type { ScoringNodeData } from "@/components/handlers/scoring-flow-canvas-handlers"
 import type { ContextNodeData } from "@/components/handlers/context-flow-canvas-handlers"
-import { Play, Upload, MessageSquare, BarChart3, Save, Check, Trash2, Wand2 } from "lucide-react"
+import { Play, Upload, MessageSquare, BarChart3, Save, Check, Trash2, Wand2, PlayCircle, Square } from "lucide-react"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
@@ -42,6 +42,18 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet"
+import { Textarea } from "@/components/ui/textarea"
+import { DEFAULT_RESUME_JSON } from "@/lib/default-resume"
+import { runContextPrompt } from "@/components/handlers/context-prompt-run-handlers"
+
+const DEFAULT_RESUME_JSON_STRING = JSON.stringify(DEFAULT_RESUME_JSON, null, 2)
 
 const firstScoringTab = createScoringPromptTab()
 
@@ -60,6 +72,12 @@ export default function PromptWorkspace() {
     nodes: Node<ContextNodeData>[]
     edges: Edge[]
   }>({ nodes: [], edges: [] })
+  const [isContextRunOpen, setIsContextRunOpen] = useState(false)
+  const [resumeJsonText, setResumeJsonText] = useState(DEFAULT_RESUME_JSON_STRING)
+  const [contextRunResult, setContextRunResult] = useState<string | null>(null)
+  const [contextRunError, setContextRunError] = useState<string | null>(null)
+  const [isContextRunning, setIsContextRunning] = useState(false)
+  const contextRunAbortRef = useRef<AbortController | null>(null)
   const canvasRef = useRef<ScoringFlowCanvasRef>(null)
   const flowCanvasRef = useRef<FlowCanvasRef>(null)
   const contextFlowCanvasRef = useRef<ContextFlowCanvasRef>(null)
@@ -245,6 +263,48 @@ export default function PromptWorkspace() {
     else canvasRef.current?.viewPrompt()
   }, [isCallPrompt, isContextPrompt])
 
+  const handleOpenContextRun = useCallback(() => {
+    setContextRunResult(null)
+    setContextRunError(null)
+    setIsContextRunOpen(true)
+  }, [])
+
+  const handleRunContextPrompt = useCallback(async () => {
+    const prompt = contextFlowCanvasRef.current?.getPrompt() ?? ""
+    let resumeJson: unknown
+    try {
+      resumeJson = JSON.parse(resumeJsonText)
+    } catch {
+      setContextRunError("Resume JSON is invalid. Check the syntax.")
+      return
+    }
+    const controller = new AbortController()
+    contextRunAbortRef.current = controller
+    setIsContextRunning(true)
+    setContextRunError(null)
+    setContextRunResult(null)
+    try {
+      const { result, error } = await runContextPrompt(
+        prompt,
+        resumeJson,
+        controller.signal,
+      )
+      if (error) setContextRunError(error)
+      else setContextRunResult(result)
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") {
+        setContextRunError((err as Error).message ?? "Unknown error")
+      }
+    } finally {
+      setIsContextRunning(false)
+      contextRunAbortRef.current = null
+    }
+  }, [resumeJsonText])
+
+  const handleStopContextRun = useCallback(() => {
+    contextRunAbortRef.current?.abort()
+  }, [])
+
   const handleCreateScoringPrompt = useCallback(
     (nodes: Node<ScoringNodeData>[], edges: Edge[], tabName: string) => {
       saveCurrentCanvasState()
@@ -365,12 +425,17 @@ export default function PromptWorkspace() {
                 <MessageSquare className="size-4" />
                 Run Conversation
               </Button>
-            ) : !isContextPrompt ? (
+            ) : isContextPrompt ? (
+              <Button variant="outline" size="sm" onClick={handleOpenContextRun} className="gap-2">
+                <PlayCircle className="size-4" />
+                Run context prompt
+              </Button>
+            ) : (
               <Button variant="outline" size="sm" onClick={handleOpenScoringResults} className="gap-2">
                 <BarChart3 className="size-4" />
                 Score Conversation
               </Button>
-            ) : null}
+            )}
           </div>
         </header>
         <div className="relative flex-1">
@@ -414,6 +479,56 @@ export default function PromptWorkspace() {
           onOpenChange={setIsWizardOpen}
           onComplete={handleWizardComplete}
         />
+
+        <Sheet open={isContextRunOpen} onOpenChange={setIsContextRunOpen}>
+          <SheetContent className="flex flex-col sm:max-w-2xl">
+            <SheetHeader className="shrink-0">
+              <SheetTitle>Run context prompt</SheetTitle>
+              <SheetDescription>
+                Paste or edit the parsed resume JSON below. The context prompt from your canvas will be run with this resume. Ensure an &quot;Input Source&quot; block contains &quot;Here is the Resume :&quot; so the resume is injected correctly.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="flex shrink-0 gap-2 px-1">
+              {isContextRunning ? (
+                <Button variant="outline" size="sm" onClick={handleStopContextRun} className="gap-2">
+                  <Square className="size-4" />
+                  Stop
+                </Button>
+              ) : (
+                <Button size="sm" onClick={handleRunContextPrompt} className="gap-2">
+                  <PlayCircle className="size-4" />
+                  Run
+                </Button>
+              )}
+            </div>
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-1">
+              <div className="flex flex-col gap-2">
+                <label htmlFor="context-resume-json" className="text-sm font-medium text-foreground">
+                  Resume JSON
+                </label>
+                <Textarea
+                  id="context-resume-json"
+                  value={resumeJsonText}
+                  onChange={(e) => setResumeJsonText(e.target.value)}
+                  placeholder="Paste parsed resume JSON..."
+                  className="min-h-[200px] max-h-[300px] overflow-y-auto font-mono text-sm"
+                />
+              </div>
+              {(contextRunResult !== null || contextRunError !== null) && (
+                <div className="flex flex-col gap-2">
+                  <span className="text-sm font-medium text-foreground">
+                    {contextRunError ? "Error" : "Result"}
+                  </span>
+                  <div className="min-h-[120px] max-h-[300px] overflow-y-auto rounded-md border bg-muted p-4">
+                    <pre className="whitespace-pre-wrap wrap-break-word text-sm text-foreground">
+                      {contextRunError ?? contextRunResult ?? ""}
+                    </pre>
+                  </div>
+                </div>
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
       </SidebarInset>
     </SidebarProvider>
   )
