@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import {
   parseCSV,
   groupByCategory,
@@ -40,6 +41,8 @@ export default function PromptWizard({
   const [interviewerName, setInterviewerName] = useState("")
   const [companyName, setCompanyName] = useState("")
   const [roleTitle, setRoleTitle] = useState("")
+  const [aboutCompany, setAboutCompany] = useState("")
+  const [aboutRole, setAboutRole] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [progressMessage, setProgressMessage] = useState("")
   const [generateError, setGenerateError] = useState("")
@@ -56,6 +59,8 @@ export default function PromptWizard({
     setInterviewerName("")
     setCompanyName("")
     setRoleTitle("")
+    setAboutCompany("")
+    setAboutRole("")
     setIsGenerating(false)
     setProgressMessage("")
     setGenerateError("")
@@ -116,7 +121,7 @@ export default function PromptWizard({
     currentStep === 0
       ? categories.length > 0 && !parseError
       : currentStep === 1
-        ? interviewerName.trim() && companyName.trim() && roleTitle.trim()
+        ? interviewerName.trim() && companyName.trim() && roleTitle.trim() && aboutCompany.trim() && aboutRole.trim()
         : false
 
   const handleNext = useCallback(() => {
@@ -138,6 +143,8 @@ export default function PromptWizard({
           interviewerName: interviewerName.trim(),
           companyName: companyName.trim(),
           roleTitle: roleTitle.trim(),
+          aboutCompany: aboutCompany.trim(),
+          aboutRole: aboutRole.trim(),
           categories,
         },
         setProgressMessage,
@@ -150,7 +157,7 @@ export default function PromptWizard({
       setIsGenerating(false)
       setProgressMessage("")
     }
-  }, [interviewerName, companyName, roleTitle, categories, onComplete, handleOpenChange])
+  }, [interviewerName, companyName, roleTitle, aboutCompany, aboutRole, categories, onComplete, handleOpenChange])
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
@@ -311,6 +318,38 @@ export default function PromptWizard({
                   The position being interviewed for.
                 </p>
               </div>
+
+              <div className="flex flex-col gap-2">
+                <label htmlFor="wizard-about-company" className="text-sm font-medium text-foreground">
+                  About the Company
+                </label>
+                <Textarea
+                  id="wizard-about-company"
+                  value={aboutCompany}
+                  onChange={(e) => setAboutCompany(e.target.value)}
+                  placeholder="Describe the company, its mission, and what it does..."
+                  rows={3}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Background information about the company for the AI to reference when answering candidate questions.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label htmlFor="wizard-about-role" className="text-sm font-medium text-foreground">
+                  About the Role
+                </label>
+                <Textarea
+                  id="wizard-about-role"
+                  value={aboutRole}
+                  onChange={(e) => setAboutRole(e.target.value)}
+                  placeholder="Describe the role's responsibilities, requirements, and expectations..."
+                  rows={3}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Description of the role to help the AI provide context to candidates.
+                </p>
+              </div>
             </div>
           )}
 
@@ -325,6 +364,10 @@ export default function PromptWizard({
                   <span className="text-foreground font-medium">{companyName}</span>
                   <span className="text-muted-foreground">Role</span>
                   <span className="text-foreground font-medium">{roleTitle}</span>
+                  <span className="text-muted-foreground">About Company</span>
+                  <span className="text-foreground font-medium line-clamp-2">{aboutCompany}</span>
+                  <span className="text-muted-foreground">About Role</span>
+                  <span className="text-foreground font-medium line-clamp-2">{aboutRole}</span>
                   <span className="text-muted-foreground">Categories</span>
                   <span className="text-foreground font-medium">{categories.length}</span>
                   <span className="text-muted-foreground">Total Questions</span>

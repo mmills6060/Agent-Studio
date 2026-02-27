@@ -20,6 +20,8 @@ interface WizardConfig {
   interviewerName: string
   companyName: string
   roleTitle: string
+  aboutCompany: string
+  aboutRole: string
   categories: CategoryGroup[]
 }
 
@@ -178,6 +180,17 @@ function substituteWizardValues(
     .replaceAll("Front Desk Assistant", config.roleTitle)
 }
 
+function buildJobInfoContent(config: WizardConfig): string {
+  return `This is information regarding the job that you will need to know to handle any questions the candidate asks.
+
+<POSITION_CONTEXT>
+
+*About the company: ${config.aboutCompany}
+
+*About the role: ${config.aboutRole}
+</POSITION_CONTEXT>`
+}
+
 function buildCallPromptNodes(
   config: WizardConfig,
   content: WizardGeneratedContent,
@@ -198,7 +211,7 @@ function buildCallPromptNodes(
   personaNode.data.content = substituteWizardValues(personaNode.data.content, config)
 
   const jobInfoNode = addBlock("job-info")
-  jobInfoNode.data.content = substituteWizardValues(jobInfoNode.data.content, config)
+  jobInfoNode.data.content = buildJobInfoContent(config)
 
   addBlock("rules")
   addBlock("instructions")
