@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import type { Node, Edge } from "@xyflow/react"
 import FlowCanvas from "@/components/flow-canvas"
 import type { FlowCanvasRef } from "@/components/flow-canvas"
+import ContextFlowCanvas from "@/components/context-flow-canvas"
+import type { ContextFlowCanvasRef } from "@/components/context-flow-canvas"
 import ScoringFlowCanvas from "@/components/scoring-flow-canvas"
 import type { ScoringFlowCanvasRef } from "@/components/scoring-flow-canvas"
 import ConversationPanel from "@/components/conversation-panel"
@@ -17,6 +19,7 @@ import {
   type ScoringPromptTab,
 } from "@/components/handlers/scoring-prompt-manager-handlers"
 import type { ScoringNodeData } from "@/components/handlers/scoring-flow-canvas-handlers"
+import type { ContextNodeData } from "@/components/handlers/context-flow-canvas-handlers"
 import { Play, Upload, MessageSquare, BarChart3, Save, Check, Trash2, Wand2 } from "lucide-react"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
@@ -24,6 +27,7 @@ import { Button } from "@/components/ui/button"
 import AddNodeToolbar from "@/components/add-node-toolbar"
 import AppSidebar from "@/components/app-sidebar"
 import { ALL_SCORING_BLOCK_TYPES } from "@/lib/scoring-block-types"
+import { ALL_CONTEXT_BLOCK_TYPES } from "@/lib/context-block-types"
 import { saveWorkspace, loadWorkspace, clearWorkspace } from "@/components/handlers/workspace-save-handlers"
 import PromptWizard from "@/components/prompt-wizard"
 import type { WizardResult } from "@/components/handlers/prompt-wizard-handlers"
@@ -52,28 +56,40 @@ export default function PromptWorkspace() {
   const [conversationMessages, setConversationMessages] = useState<ConversationMessage[]>([])
   const [isScoringResultsOpen, setIsScoringResultsOpen] = useState(false)
   const [isWizardOpen, setIsWizardOpen] = useState(false)
+  const [contextPromptState, setContextPromptState] = useState<{
+    nodes: Node<ContextNodeData>[]
+    edges: Edge[]
+  }>({ nodes: [], edges: [] })
   const canvasRef = useRef<ScoringFlowCanvasRef>(null)
   const flowCanvasRef = useRef<FlowCanvasRef>(null)
+  const contextFlowCanvasRef = useRef<ContextFlowCanvasRef>(null)
 
   const isCallPrompt = activeTab === "call-prompt"
+  const isContextPrompt = activeTab === "context-prompt"
   const scoringTabToRender = scoringTabs.find((t) => t.id === currentScoringTabId) ?? scoringTabs[0]
 
   const saveCurrentCanvasState = useCallback(() => {
-    if (!canvasRef.current || isCallPrompt) return
+    if (!canvasRef.current || isCallPrompt || isContextPrompt) return
     const { nodes, edges } = canvasRef.current.getState()
     setScoringTabs((prev) => saveScoringPromptTabState(prev, activeTab, nodes, edges))
-  }, [activeTab, isCallPrompt])
+  }, [activeTab, isCallPrompt, isContextPrompt])
 
   const handleSwitchTab = useCallback(
     (tabId: string) => {
       if (tabId === activeTab) return
       saveCurrentCanvasState()
+      if (isContextPrompt) {
+        const state = contextFlowCanvasRef.current?.getState()
+        if (state) setContextPromptState(state)
+      }
       if (isCallPrompt) flowCanvasRef.current?.deselectAll()
+      else if (isContextPrompt) contextFlowCanvasRef.current?.deselectAll()
       else canvasRef.current?.deselectAll()
-      if (tabId !== "call-prompt") setCurrentScoringTabId(tabId)
+      if (tabId !== "call-prompt" && tabId !== "context-prompt")
+        setCurrentScoringTabId(tabId)
       setActiveTab(tabId)
     },
-    [activeTab, isCallPrompt, saveCurrentCanvasState],
+    [activeTab, isCallPrompt, isContextPrompt, saveCurrentCanvasState],
   )
 
   const handleAddScoringTab = useCallback(() => {
@@ -155,8 +171,10 @@ export default function PromptWorkspace() {
   const handleSave = useCallback(() => {
     saveCurrentCanvasState()
     const callPromptState = flowCanvasRef.current?.getState() ?? { nodes: [], edges: [] }
+    const contextState =
+      contextFlowCanvasRef.current?.getState() ?? contextPromptState
     const latestScoringTabs = (() => {
-      if (!isCallPrompt && canvasRef.current) {
+      if (!isCallPrompt && !isContextPrompt && canvasRef.current) {
         const { nodes, edges } = canvasRef.current.getState()
         return saveScoringPromptTabState(scoringTabs, activeTab, nodes, edges)
       }
@@ -164,6 +182,7 @@ export default function PromptWorkspace() {
     })()
     const success = saveWorkspace({
       callPrompt: callPromptState,
+      contextPrompt: contextState,
       scoringTabs: latestScoringTabs,
       activeTab,
       currentScoringTabId,
@@ -172,11 +191,13 @@ export default function PromptWorkspace() {
       setIsSaved(true)
       setTimeout(() => setIsSaved(false), 2000)
     }
-  }, [saveCurrentCanvasState, scoringTabs, activeTab, currentScoringTabId, isCallPrompt])
+  }, [saveCurrentCanvasState, scoringTabs, activeTab, currentScoringTabId, isCallPrompt, isContextPrompt, contextPromptState])
 
   const handleClear = useCallback(() => {
     clearWorkspace()
     flowCanvasRef.current?.setState([], [])
+    contextFlowCanvasRef.current?.setState([], [])
+    setContextPromptState({ nodes: [], edges: [] })
     const freshTab = createScoringPromptTab()
     setScoringTabs([freshTab])
     setCurrentScoringTabId(freshTab.id)
@@ -193,6 +214,9 @@ export default function PromptWorkspace() {
         flowCanvasRef.current?.setState(saved.callPrompt.nodes, saved.callPrompt.edges)
       }, 100)
     }
+    if (saved.contextPrompt.nodes.length > 0) {
+      setContextPromptState(saved.contextPrompt)
+    }
     if (saved.scoringTabs.length > 0) {
       setScoringTabs(saved.scoringTabs)
       setCurrentScoringTabId(saved.currentScoringTabId || saved.scoringTabs[0].id)
@@ -203,20 +227,23 @@ export default function PromptWorkspace() {
   const handleAddBlock = useCallback(
     (blockType: string) => {
       if (isCallPrompt) flowCanvasRef.current?.addBlock(blockType)
+      else if (isContextPrompt) contextFlowCanvasRef.current?.addBlock(blockType)
       else canvasRef.current?.addBlock(blockType)
     },
-    [isCallPrompt],
+    [isCallPrompt, isContextPrompt],
   )
 
   const handleImport = useCallback(() => {
     if (isCallPrompt) flowCanvasRef.current?.openImport()
+    else if (isContextPrompt) contextFlowCanvasRef.current?.openImport()
     else canvasRef.current?.openImport()
-  }, [isCallPrompt])
+  }, [isCallPrompt, isContextPrompt])
 
   const handleViewPrompt = useCallback(() => {
     if (isCallPrompt) flowCanvasRef.current?.viewPrompt()
+    else if (isContextPrompt) contextFlowCanvasRef.current?.viewPrompt()
     else canvasRef.current?.viewPrompt()
-  }, [isCallPrompt])
+  }, [isCallPrompt, isContextPrompt])
 
   const handleCreateScoringPrompt = useCallback(
     (nodes: Node<ScoringNodeData>[], edges: Edge[], tabName: string) => {
@@ -277,12 +304,22 @@ export default function PromptWorkspace() {
           <SidebarTrigger />
           <Separator orientation="vertical" className="h-4" />
           <span className="text-sm font-medium truncate">
-            {isCallPrompt ? "Call Prompt" : scoringTabToRender?.name ?? "Scoring Prompt"}
+            {isCallPrompt
+              ? "Call Prompt"
+              : isContextPrompt
+                ? "Context Prompt"
+                : scoringTabToRender?.name ?? "Scoring Prompt"}
           </span>
           <Separator orientation="vertical" className="h-4" />
           <AddNodeToolbar
             onAddBlock={handleAddBlock}
-            blockTypes={isCallPrompt ? undefined : ALL_SCORING_BLOCK_TYPES}
+            blockTypes={
+              isCallPrompt
+                ? undefined
+                : isContextPrompt
+                  ? ALL_CONTEXT_BLOCK_TYPES
+                  : ALL_SCORING_BLOCK_TYPES
+            }
           />
           <div className="ml-auto flex items-center gap-2">
             <AlertDialog>
@@ -328,19 +365,26 @@ export default function PromptWorkspace() {
                 <MessageSquare className="size-4" />
                 Run Conversation
               </Button>
-            ) : (
+            ) : !isContextPrompt ? (
               <Button variant="outline" size="sm" onClick={handleOpenScoringResults} className="gap-2">
                 <BarChart3 className="size-4" />
                 Score Conversation
               </Button>
-            )}
+            ) : null}
           </div>
         </header>
         <div className="relative flex-1">
           <div className={isCallPrompt ? "" : "hidden"}>
             <FlowCanvas ref={flowCanvasRef} onCreateScoringPrompt={handleCreateScoringPrompt} />
           </div>
-          <div className={isCallPrompt ? "hidden" : ""}>
+          <div className={isContextPrompt ? "" : "hidden"}>
+            <ContextFlowCanvas
+              ref={contextFlowCanvasRef}
+              initialNodes={contextPromptState.nodes}
+              initialEdges={contextPromptState.edges}
+            />
+          </div>
+          <div className={isCallPrompt || isContextPrompt ? "hidden" : ""}>
             <ScoringFlowCanvas
               key={scoringTabToRender.id}
               ref={canvasRef}

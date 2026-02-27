@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Phone, ClipboardCheck, Plus, X, ChevronRight, Pencil, GripVertical } from "lucide-react"
+import { Phone, FileText, ClipboardCheck, Plus, X, ChevronRight, Pencil, GripVertical } from "lucide-react"
 import {
   Collapsible,
   CollapsibleContent,
@@ -183,6 +183,16 @@ export default function AppSidebar({
               >
                 <Phone />
                 <span>Call Prompt</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                isActive={activeTab === "context-prompt"}
+                onClick={() => onSwitchTab("context-prompt")}
+              >
+                <FileText />
+                <span>Context Prompt</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
 
