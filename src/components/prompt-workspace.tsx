@@ -264,8 +264,6 @@ export default function PromptWorkspace() {
   }, [isCallPrompt, isContextPrompt])
 
   const handleOpenContextRun = useCallback(() => {
-    setContextRunResult(null)
-    setContextRunError(null)
     setIsContextRunOpen(true)
   }, [])
 
