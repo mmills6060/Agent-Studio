@@ -25,6 +25,11 @@ interface SqlExecutionResult {
   command: string
 }
 
+interface SqlMutationResult extends SqlExecutionResult {
+  affectedRows: number
+  insertId: number | null
+}
+
 interface DatabaseConnectionResult {
   connected: boolean
   checkedAt: string
@@ -193,6 +198,45 @@ export async function executeSqlQuery(
     rows: rows as Record<string, unknown>[],
     rowCount: rows.length,
     command: "QUERY",
+  }
+}
+
+export async function executeSqlMutation(
+  query: string,
+  params: unknown[] = [],
+): Promise<SqlMutationResult> {
+  if (!query.trim())
+    throw new SqlQueryValidationError("query is required")
+
+  if (!Array.isArray(params))
+    throw new SqlQueryValidationError("params must be an array")
+
+  if (!isMutationQuery(query))
+    throw new SqlQueryValidationError(
+      "executeSqlMutation only accepts mutating SQL statements",
+    )
+
+  const result = await withMysqlConnection((connection) =>
+    connection.query({
+      sql: query,
+      values: params,
+      timeout: MYSQL_QUERY_TIMEOUT_MS,
+    }),
+  )
+
+  const rows = Array.isArray(result[0]) ? result[0] : []
+  const mutationMetadata = !Array.isArray(result[0]) && typeof result[0] === "object" && result[0] !== null
+    ? result[0] as { affectedRows?: number; insertId?: number }
+    : null
+
+  return {
+    rows: rows as Record<string, unknown>[],
+    rowCount: rows.length,
+    command: "QUERY",
+    affectedRows: mutationMetadata?.affectedRows ?? 0,
+    insertId: typeof mutationMetadata?.insertId === "number" && mutationMetadata.insertId > 0
+      ? mutationMetadata.insertId
+      : null,
   }
 }
 

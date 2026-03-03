@@ -5,6 +5,17 @@ interface JobRolesResponse {
   error?: string
 }
 
+interface CreateJobRoleInput {
+  orgId: string
+  roleDescription: string
+  assessmentInstanceName: string
+}
+
+interface CreateJobRoleResponse {
+  roleId?: string
+  error?: string
+}
+
 function parseJobRole(row: Record<string, unknown>): AppSidebarJobRole | null {
   const roleId = row.RoleID
   const roleDescription = row.RoleDescription
@@ -37,4 +48,29 @@ export async function getJobRolesByOrganization(orgId: string): Promise<AppSideb
   return rows
     .map((row) => parseJobRole(row))
     .filter((role): role is AppSidebarJobRole => role !== null)
+}
+
+export async function createJobRole(input: CreateJobRoleInput): Promise<string | null> {
+  const response = await fetch("/api/job-roles", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  })
+
+  let body: CreateJobRoleResponse | null = null
+  try {
+    body = await response.json()
+  } catch {
+    body = null
+  }
+
+  if (!response.ok)
+    throw new Error(body?.error ?? "Failed to create job role")
+
+  if (typeof body?.roleId !== "string")
+    return null
+
+  return body.roleId
 }

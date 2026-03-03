@@ -26,6 +26,7 @@ interface AppSidebarProps {
   selectedOrganizationId: string | null
   jobRoles: AppSidebarJobRole[]
   isLoadingJobRoles: boolean
+  isCreatingJobRole: boolean
   jobRolesError: string | null
   selectedJobRoleId: string | null
   promptReferences: AppSidebarPromptReference[]
@@ -47,6 +48,7 @@ interface AppSidebarProps {
   onRenameKeyDown: (e: React.KeyboardEvent) => void
   onReorderScoringTabs: (activeId: string, overId: string) => void
   onSelectOrganization: (orgId: string) => void
+  onCreateJobRole: (assessmentInstanceName: string) => Promise<void>
   onSelectJobRole: (roleId: string) => void
   onSelectPromptReference: (promptId: string) => void
   onSelectCriteria: (criteriaId: string) => void

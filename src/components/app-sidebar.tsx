@@ -36,6 +36,16 @@ import {
   SidebarMenuSubItem,
   SidebarMenuSubButton,
 } from "@/components/ui/sidebar"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import type { AppSidebarProps } from "@/components/handlers/app-sidebar-handlers"
 import type { ScoringPromptTab } from "@/components/handlers/scoring-prompt-manager-handlers"
 
@@ -150,6 +160,7 @@ export default function AppSidebar({
   selectedOrganizationId,
   jobRoles,
   isLoadingJobRoles,
+  isCreatingJobRole,
   jobRolesError,
   selectedJobRoleId,
   promptReferences,
@@ -171,11 +182,15 @@ export default function AppSidebar({
   onRenameKeyDown,
   onReorderScoringTabs,
   onSelectOrganization,
+  onCreateJobRole,
   onSelectJobRole,
   onSelectPromptReference,
   onSelectCriteria,
 }: AppSidebarProps) {
   const [isDragging, setIsDragging] = useState(false)
+  const [isCreateRoleOpen, setIsCreateRoleOpen] = useState(false)
+  const [assessmentInstanceName, setAssessmentInstanceName] = useState("")
+  const [createRoleError, setCreateRoleError] = useState<string | null>(null)
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -186,6 +201,24 @@ export default function AppSidebar({
     const { active, over } = event
     if (over && active.id !== over.id)
       onReorderScoringTabs(active.id as string, over.id as string)
+  }
+
+  async function handleCreateRoleSubmit() {
+    const trimmedAssessmentInstanceName = assessmentInstanceName.trim()
+    if (!trimmedAssessmentInstanceName) {
+      setCreateRoleError("Assessment instance name is required")
+      return
+    }
+
+    setCreateRoleError(null)
+    try {
+      await onCreateJobRole(trimmedAssessmentInstanceName)
+      setAssessmentInstanceName("")
+      setIsCreateRoleOpen(false)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to create role"
+      setCreateRoleError(message)
+    }
   }
 
   return (
@@ -287,6 +320,22 @@ export default function AppSidebar({
                   </SidebarMenuButton>
                   {selectedOrganizationId === organization.orgId && (
                     <SidebarMenuSub>
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton asChild>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCreateRoleError(null)
+                              setAssessmentInstanceName("")
+                              setIsCreateRoleOpen(true)
+                            }}
+                            className="w-full text-left"
+                          >
+                            <Plus />
+                            <span>Create role</span>
+                          </button>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
                       {isLoadingJobRoles ? (
                         <SidebarMenuSubItem>
                           <SidebarMenuSubButton asChild>
@@ -444,6 +493,52 @@ export default function AppSidebar({
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
+      <Dialog
+        open={isCreateRoleOpen}
+        onOpenChange={(open) => {
+          setIsCreateRoleOpen(open)
+          if (!open) {
+            setCreateRoleError(null)
+            setAssessmentInstanceName("")
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create role</DialogTitle>
+            <DialogDescription>
+              Create a role and add an assessment instance with type JOB.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2">
+            <label htmlFor="assessment-instance-name" className="text-sm font-medium text-foreground">
+              Assessment instance name
+            </label>
+            <Input
+              id="assessment-instance-name"
+              value={assessmentInstanceName}
+              onChange={(event) => setAssessmentInstanceName(event.target.value)}
+              placeholder="e.g. Senior Account Executive"
+              disabled={isCreatingJobRole}
+            />
+            {createRoleError && (
+              <p className="text-sm text-destructive">{createRoleError}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsCreateRoleOpen(false)}
+              disabled={isCreatingJobRole}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleCreateRoleSubmit} disabled={isCreatingJobRole}>
+              {isCreatingJobRole ? "Creating..." : "Create role"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Sidebar>
   )
 }

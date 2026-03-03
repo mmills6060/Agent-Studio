@@ -53,7 +53,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { DEFAULT_RESUME_JSON } from "@/lib/default-resume"
 import { runContextPrompt } from "@/components/handlers/context-prompt-run-handlers"
 import { getCriteriaScoringPromptById } from "@/components/handlers/criteria-scoring-prompt-handlers"
-import { getJobRolesByOrganization } from "@/components/handlers/job-roles-handlers"
+import { createJobRole, getJobRolesByOrganization } from "@/components/handlers/job-roles-handlers"
 import { getPromptReferencesByRole } from "@/components/handlers/prompt-references-handlers"
 import { getPromptStringById } from "@/components/handlers/prompt-string-handlers"
 import { getCriteriaByRole } from "@/components/handlers/role-criteria-handlers"
@@ -72,6 +72,7 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
   const [selectedOrganizationId, setSelectedOrganizationId] = useState<string | null>(null)
   const [jobRoles, setJobRoles] = useState<AppSidebarJobRole[]>([])
   const [isLoadingJobRoles, setIsLoadingJobRoles] = useState(false)
+  const [isCreatingJobRole, setIsCreatingJobRole] = useState(false)
   const [jobRolesError, setJobRolesError] = useState<string | null>(null)
   const [selectedJobRoleId, setSelectedJobRoleId] = useState<string | null>(null)
   const [promptReferences, setPromptReferences] = useState<AppSidebarPromptReference[]>([])
@@ -378,6 +379,7 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
     setCriteriaImportError(null)
     setIsLoadingJobRoles(true)
     setJobRolesError(null)
+    setIsCreatingJobRole(false)
     try {
       const roles = await getJobRolesByOrganization(orgId)
       setJobRoles(roles)
@@ -418,6 +420,33 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
       setIsLoadingCriteria(false)
     }
   }, [])
+
+  const handleCreateJobRole = useCallback(async (assessmentInstanceName: string) => {
+    const orgId = selectedOrganizationId?.trim() ?? ""
+    if (!orgId)
+      throw new Error("Select an organization before creating a role")
+
+    const trimmedAssessmentName = assessmentInstanceName.trim()
+    if (!trimmedAssessmentName)
+      throw new Error("Assessment instance name is required")
+
+    setIsCreatingJobRole(true)
+    setJobRolesError(null)
+    try {
+      const createdRoleId = await createJobRole({
+        orgId,
+        roleDescription: trimmedAssessmentName,
+        assessmentInstanceName: trimmedAssessmentName,
+      })
+
+      const roles = await getJobRolesByOrganization(orgId)
+      setJobRoles(roles)
+      if (createdRoleId)
+        setSelectedJobRoleId(createdRoleId)
+    } finally {
+      setIsCreatingJobRole(false)
+    }
+  }, [selectedOrganizationId])
 
   const importPromptToActiveCanvas = useCallback(async (rawText: string) => {
     if (isCallPrompt)
@@ -468,6 +497,7 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
         selectedOrganizationId={selectedOrganizationId}
         jobRoles={jobRoles}
         isLoadingJobRoles={isLoadingJobRoles}
+        isCreatingJobRole={isCreatingJobRole}
         jobRolesError={jobRolesError}
         selectedJobRoleId={selectedJobRoleId}
         promptReferences={promptReferences}
@@ -489,6 +519,7 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
         onRenameKeyDown={handleRenameKeyDown}
         onReorderScoringTabs={handleReorderScoringTabs}
         onSelectOrganization={handleSelectOrganization}
+        onCreateJobRole={handleCreateJobRole}
         onSelectJobRole={handleSelectJobRole}
         onSelectPromptReference={handleSelectPromptReference}
         onSelectCriteria={handleSelectCriteria}
