@@ -20,7 +20,7 @@ import {
 } from "@/components/handlers/scoring-prompt-manager-handlers"
 import type { ScoringNodeData } from "@/components/handlers/scoring-flow-canvas-handlers"
 import type { ContextNodeData } from "@/components/handlers/context-flow-canvas-handlers"
-import { Play, Upload, MessageSquare, BarChart3, Save, Check, Trash2, Wand2, PlayCircle, Square } from "lucide-react"
+import { Play, Upload, MessageSquare, BarChart3, Save, Check, Trash2, Wand2, PlayCircle, Square, Database } from "lucide-react"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
@@ -52,6 +52,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { DEFAULT_RESUME_JSON } from "@/lib/default-resume"
 import { runContextPrompt } from "@/components/handlers/context-prompt-run-handlers"
+import { testDatabaseConnection } from "@/components/handlers/database-connection-handlers"
 
 const DEFAULT_RESUME_JSON_STRING = JSON.stringify(DEFAULT_RESUME_JSON, null, 2)
 
@@ -77,6 +78,9 @@ export default function PromptWorkspace() {
   const [contextRunResult, setContextRunResult] = useState<string | null>(null)
   const [contextRunError, setContextRunError] = useState<string | null>(null)
   const [isContextRunning, setIsContextRunning] = useState(false)
+  const [isTestingDatabaseConnection, setIsTestingDatabaseConnection] = useState(false)
+  const [databaseConnectionStatus, setDatabaseConnectionStatus] = useState<"idle" | "success" | "error">("idle")
+  const [databaseConnectionMessage, setDatabaseConnectionMessage] = useState("")
   const contextRunAbortRef = useRef<AbortController | null>(null)
   const canvasRef = useRef<ScoringFlowCanvasRef>(null)
   const flowCanvasRef = useRef<FlowCanvasRef>(null)
@@ -303,6 +307,37 @@ export default function PromptWorkspace() {
     contextRunAbortRef.current?.abort()
   }, [])
 
+  const handleTestDatabaseConnection = useCallback(async () => {
+    setIsTestingDatabaseConnection(true)
+    setDatabaseConnectionStatus("idle")
+    setDatabaseConnectionMessage("")
+
+    try {
+      const result = await testDatabaseConnection()
+      if (!result.isConnected) {
+        setDatabaseConnectionStatus("error")
+        setDatabaseConnectionMessage(result.error ?? "Connection failed")
+        return
+      }
+
+      setDatabaseConnectionStatus("success")
+      const checkedAt = result.checkedAt
+        ? new Date(result.checkedAt).toLocaleTimeString()
+        : "just now"
+      setDatabaseConnectionMessage(`Connected at ${checkedAt}`)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Connection failed"
+      setDatabaseConnectionStatus("error")
+      setDatabaseConnectionMessage(message)
+    } finally {
+      setIsTestingDatabaseConnection(false)
+    }
+  }, [])
+
+  const databaseStatusBadgeClasses = databaseConnectionStatus === "success"
+    ? "border-chart-2/30 bg-chart-2/10 text-chart-2"
+    : "border-destructive/30 bg-destructive/10 text-destructive"
+
   const handleCreateScoringPrompt = useCallback(
     (nodes: Node<ScoringNodeData>[], edges: Edge[], tabName: string) => {
       saveCurrentCanvasState()
@@ -380,6 +415,31 @@ export default function PromptWorkspace() {
             }
           />
           <div className="ml-auto flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleTestDatabaseConnection}
+              disabled={isTestingDatabaseConnection}
+              className="gap-2"
+            >
+              <Database className="size-4" />
+              {isTestingDatabaseConnection ? "Testing DB..." : "Test DB Connection"}
+            </Button>
+            {databaseConnectionStatus !== "idle" && (
+              <div className="flex items-center gap-1.5">
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${databaseStatusBadgeClasses}`}
+                >
+                  <span
+                    className={`size-1.5 rounded-full ${databaseConnectionStatus === "success" ? "bg-chart-2" : "bg-destructive"}`}
+                  />
+                  {databaseConnectionStatus === "success" ? "Connected" : "Failed"}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {databaseConnectionMessage}
+                </span>
+              </div>
+            )}
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="outline" size="sm" className="gap-2">

@@ -85,9 +85,20 @@ Create a `.env.local` file in the project root:
 ```bash
 GEMINI_API_KEY=your_gemini_api_key
 OPENAI_API_KEY=your_openai_api_key
+SSH_HOST=your_ssh_host
+SSH_PORT=22
+SSH_USER=your_ssh_user
+SSH_KEY_PATH=/absolute/path/to/ssh_private_key
+MYSQL_HOST=your_mysql_host
+MYSQL_PORT=3306
+MYSQL_USER=your_mysql_user
+MYSQL_PASSWORD=your_mysql_password
+MYSQL_DATABASE=your_mysql_database
+ALLOW_SQL_MUTATIONS=false
 ```
 
-Both keys are accessed server-side only through Next.js API routes.
+All environment variables are accessed server-side only through Next.js API routes.
+`SSH_*` and `MYSQL_*` are used by the SQL query endpoint, and `ALLOW_SQL_MUTATIONS` defaults to read-only behavior unless set to `true`.
 
 ### Running Locally
 
@@ -113,7 +124,8 @@ src/
 ├── app/
 │   ├── api/
 │   │   ├── conversation/route.ts   # Gemini conversation endpoint
-│   │   └── scoring/route.ts        # OpenAI scoring endpoint
+│   │   ├── scoring/route.ts        # OpenAI scoring endpoint
+│   │   └── sql-query/route.ts      # SQL query endpoint
 │   ├── globals.css                  # Tailwind base styles
 │   ├── layout.tsx                   # Root layout
 │   └── page.tsx                     # Entry point
@@ -168,6 +180,34 @@ Scores a conversation transcript using OpenAI.
 {
   "scoringPrompt": "Evaluate the following conversation...",
   "conversation": "Interviewer: ... Candidate: ..."
+}
+```
+
+### `POST /api/sql-query`
+
+Runs parameterized SQL against the configured database.
+
+By default, mutating statements (such as `INSERT`, `UPDATE`, `DELETE`, `ALTER`, and `DROP`) are blocked. Set `ALLOW_SQL_MUTATIONS=true` to enable them.
+
+**Request body:**
+
+```json
+{
+  "query": "SELECT id, name FROM users WHERE is_active = ? LIMIT ?",
+  "params": [true, 25]
+}
+```
+
+### `GET /api/sql-query`
+
+Tests connectivity to the configured database without running user-provided SQL.
+
+**Response body:**
+
+```json
+{
+  "connected": true,
+  "checkedAt": "2026-03-03T19:22:31.401Z"
 }
 ```
 
