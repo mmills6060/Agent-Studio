@@ -333,8 +333,7 @@ export default function AppSidebar({
                                   <SidebarMenuSubItem>
                                     <SidebarMenuSubButton asChild>
                                       <button type="button" disabled>
-                                        <Hash />
-                                        <span>Loading prompt IDs...</span>
+                                        <span>Loading prompts...</span>
                                       </button>
                                     </SidebarMenuSubButton>
                                   </SidebarMenuSubItem>
@@ -358,7 +357,7 @@ export default function AppSidebar({
                                   </SidebarMenuSubItem>
                                 ) : (
                                   <>
-                                    {promptReferences.map((reference) => (
+                                    {promptReferences.flatMap((reference) => [
                                       <SidebarMenuSubItem key={reference.promptId}>
                                         <SidebarMenuSubButton asChild>
                                           <button
@@ -366,40 +365,16 @@ export default function AppSidebar({
                                             onClick={() => onSelectPromptReference(reference.promptId)}
                                             className="w-full text-left"
                                           >
-                                            <Hash />
+                                            <Phone />
                                             <span>Call Prompt</span>
                                           </button>
                                         </SidebarMenuSubButton>
-                                        <SidebarMenuSub>
-                                          {isLoadingCriteria ? (
-                                            <SidebarMenuSubItem>
-                                              <SidebarMenuSubButton asChild>
-                                                <button type="button" disabled>
-                                                  <ListChecks />
-                                                  <span>Loading criteria...</span>
-                                                </button>
-                                              </SidebarMenuSubButton>
-                                            </SidebarMenuSubItem>
-                                          ) : criteriaError ? (
-                                            <SidebarMenuSubItem>
-                                              <SidebarMenuSubButton asChild>
-                                                <button type="button" disabled>
-                                                  <ListChecks />
-                                                  <span>{criteriaError}</span>
-                                                </button>
-                                              </SidebarMenuSubButton>
-                                            </SidebarMenuSubItem>
-                                          ) : (criteriaByPromptId[reference.promptId] ?? []).length === 0 ? (
-                                            <SidebarMenuSubItem>
-                                              <SidebarMenuSubButton asChild>
-                                                <button type="button" disabled>
-                                                  <ListChecks />
-                                                  <span>No criteria found</span>
-                                                </button>
-                                              </SidebarMenuSubButton>
-                                            </SidebarMenuSubItem>
-                                          ) : (
-                                            (criteriaByPromptId[reference.promptId] ?? []).map((criteria) => (
+                                      </SidebarMenuSubItem>,
+                                      ...(isLoadingCriteria
+                                        ? []
+                                        : criteriaError
+                                          ? []
+                                          : (criteriaByPromptId[reference.promptId] ?? []).map((criteria) => (
                                               <SidebarMenuSubItem key={`${reference.promptId}-${criteria.criteriaId}`}>
                                                 <SidebarMenuSubButton asChild>
                                                   <button
@@ -412,11 +387,28 @@ export default function AppSidebar({
                                                   </button>
                                                 </SidebarMenuSubButton>
                                               </SidebarMenuSubItem>
-                                            ))
-                                          )}
-                                        </SidebarMenuSub>
+                                            ))),
+                                    ])}
+                                    {isLoadingCriteria && (
+                                      <SidebarMenuSubItem>
+                                        <SidebarMenuSubButton asChild>
+                                          <button type="button" disabled>
+                                            <ListChecks />
+                                            <span>Loading criteria...</span>
+                                          </button>
+                                        </SidebarMenuSubButton>
                                       </SidebarMenuSubItem>
-                                    ))}
+                                    )}
+                                    {criteriaError && !isLoadingCriteria && (
+                                      <SidebarMenuSubItem>
+                                        <SidebarMenuSubButton asChild>
+                                          <button type="button" disabled>
+                                            <ListChecks />
+                                            <span>{criteriaError}</span>
+                                          </button>
+                                        </SidebarMenuSubButton>
+                                      </SidebarMenuSubItem>
+                                    )}
                                     {criteriaImportError && (
                                       <SidebarMenuSubItem>
                                         <SidebarMenuSubButton asChild>
