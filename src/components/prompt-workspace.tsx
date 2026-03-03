@@ -53,10 +53,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { DEFAULT_RESUME_JSON } from "@/lib/default-resume"
 import { runContextPrompt } from "@/components/handlers/context-prompt-run-handlers"
 import { testDatabaseConnection } from "@/components/handlers/database-connection-handlers"
+import { getCriteriaScoringPromptById } from "@/components/handlers/criteria-scoring-prompt-handlers"
 import { getJobRolesByOrganization } from "@/components/handlers/job-roles-handlers"
 import { getPromptReferencesByRole } from "@/components/handlers/prompt-references-handlers"
 import { getPromptStringById } from "@/components/handlers/prompt-string-handlers"
-import type { AppSidebarJobRole, AppSidebarOrganization, AppSidebarPromptReference } from "@/components/handlers/app-sidebar-handlers"
+import { getCriteriaByRole } from "@/components/handlers/role-criteria-handlers"
+import type { AppSidebarCriteria, AppSidebarJobRole, AppSidebarOrganization, AppSidebarPromptReference } from "@/components/handlers/app-sidebar-handlers"
 
 const DEFAULT_RESUME_JSON_STRING = JSON.stringify(DEFAULT_RESUME_JSON, null, 2)
 
@@ -76,7 +78,11 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
   const [promptReferences, setPromptReferences] = useState<AppSidebarPromptReference[]>([])
   const [isLoadingPromptReferences, setIsLoadingPromptReferences] = useState(false)
   const [promptReferencesError, setPromptReferencesError] = useState<string | null>(null)
+  const [criteriaByPromptId, setCriteriaByPromptId] = useState<Record<string, AppSidebarCriteria[]>>({})
+  const [isLoadingCriteria, setIsLoadingCriteria] = useState(false)
+  const [criteriaError, setCriteriaError] = useState<string | null>(null)
   const [promptImportError, setPromptImportError] = useState<string | null>(null)
+  const [criteriaImportError, setCriteriaImportError] = useState<string | null>(null)
   const [scoringTabs, setScoringTabs] = useState<ScoringPromptTab[]>([firstScoringTab])
   const [currentScoringTabId, setCurrentScoringTabId] = useState(firstScoringTab.id)
   const [editingTabId, setEditingTabId] = useState<string | null>(null)
@@ -400,7 +406,11 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
     setPromptReferences([])
     setIsLoadingPromptReferences(false)
     setPromptReferencesError(null)
+    setCriteriaByPromptId({})
+    setIsLoadingCriteria(false)
+    setCriteriaError(null)
     setPromptImportError(null)
+    setCriteriaImportError(null)
     setIsLoadingJobRoles(true)
     setJobRolesError(null)
     try {
@@ -418,18 +428,29 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
   const handleSelectJobRole = useCallback(async (roleId: string) => {
     setSelectedJobRoleId(roleId)
     setPromptReferences([])
+    setCriteriaByPromptId({})
     setIsLoadingPromptReferences(true)
+    setIsLoadingCriteria(true)
     setPromptReferencesError(null)
+    setCriteriaError(null)
     setPromptImportError(null)
+    setCriteriaImportError(null)
     try {
-      const references = await getPromptReferencesByRole(roleId)
+      const [references, criteria] = await Promise.all([
+        getPromptReferencesByRole(roleId),
+        getCriteriaByRole(roleId),
+      ])
       setPromptReferences(references)
+      setCriteriaByPromptId(criteria)
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to load prompt IDs"
       setPromptReferences([])
       setPromptReferencesError(message)
+      setCriteriaByPromptId({})
+      setCriteriaError(message)
     } finally {
       setIsLoadingPromptReferences(false)
+      setIsLoadingCriteria(false)
     }
   }, [])
 
@@ -445,6 +466,7 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
 
   const handleSelectPromptReference = useCallback(async (promptId: string) => {
     setPromptImportError(null)
+    setCriteriaImportError(null)
     try {
       const promptString = await getPromptStringById(promptId)
       const imported = await importPromptToActiveCanvas(promptString)
@@ -455,6 +477,22 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
       setPromptImportError(message)
     }
   }, [importPromptToActiveCanvas])
+
+  const handleSelectCriteria = useCallback(async (criteriaId: string) => {
+    setCriteriaImportError(null)
+    setPromptImportError(null)
+    try {
+      const scoringPrompt = await getCriteriaScoringPromptById(criteriaId)
+      const imported = (await canvasRef.current?.importPrompt(scoringPrompt)) ?? false
+      if (!imported)
+        setCriteriaImportError("Scoring prompt could not be parsed")
+      else
+        setActiveTab(currentScoringTabId)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to import scoring prompt"
+      setCriteriaImportError(message)
+    }
+  }, [currentScoringTabId])
 
   return (
     <SidebarProvider>
@@ -470,7 +508,11 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
         promptReferences={promptReferences}
         isLoadingPromptReferences={isLoadingPromptReferences}
         promptReferencesError={promptReferencesError}
+        criteriaByPromptId={criteriaByPromptId}
+        isLoadingCriteria={isLoadingCriteria}
+        criteriaError={criteriaError}
         promptImportError={promptImportError}
+        criteriaImportError={criteriaImportError}
         editingTabId={editingTabId}
         editingName={editingName}
         onSwitchTab={handleSwitchTab}
@@ -484,6 +526,7 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
         onSelectOrganization={handleSelectOrganization}
         onSelectJobRole={handleSelectJobRole}
         onSelectPromptReference={handleSelectPromptReference}
+        onSelectCriteria={handleSelectCriteria}
       />
       <SidebarInset>
         <header className="flex h-10 items-center gap-2 px-2">

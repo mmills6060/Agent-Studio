@@ -14,6 +14,11 @@ interface AppSidebarPromptReference {
   promptId: string
 }
 
+interface AppSidebarCriteria {
+  criteriaId: string
+  criteriaName: string
+}
+
 interface AppSidebarProps {
   activeTab: string
   scoringTabs: ScoringPromptTab[]
@@ -26,7 +31,11 @@ interface AppSidebarProps {
   promptReferences: AppSidebarPromptReference[]
   isLoadingPromptReferences: boolean
   promptReferencesError: string | null
+  criteriaByPromptId: Record<string, AppSidebarCriteria[]>
+  isLoadingCriteria: boolean
+  criteriaError: string | null
   promptImportError: string | null
+  criteriaImportError: string | null
   editingTabId: string | null
   editingName: string
   onSwitchTab: (tabId: string) => void
@@ -40,11 +49,13 @@ interface AppSidebarProps {
   onSelectOrganization: (orgId: string) => void
   onSelectJobRole: (roleId: string) => void
   onSelectPromptReference: (promptId: string) => void
+  onSelectCriteria: (criteriaId: string) => void
 }
 
 export type {
   AppSidebarJobRole,
   AppSidebarOrganization,
+  AppSidebarCriteria,
   AppSidebarPromptReference,
   AppSidebarProps,
 }

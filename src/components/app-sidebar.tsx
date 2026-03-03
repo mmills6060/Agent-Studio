@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Phone, FileText, ClipboardCheck, Plus, X, ChevronRight, Pencil, GripVertical, Building2, BriefcaseBusiness, Hash } from "lucide-react"
+import { Phone, FileText, ClipboardCheck, Plus, X, ChevronRight, Pencil, GripVertical, Building2, BriefcaseBusiness, Hash, ListChecks } from "lucide-react"
 import {
   Collapsible,
   CollapsibleContent,
@@ -155,7 +155,11 @@ export default function AppSidebar({
   promptReferences,
   isLoadingPromptReferences,
   promptReferencesError,
+  criteriaByPromptId,
+  isLoadingCriteria,
+  criteriaError,
   promptImportError,
+  criteriaImportError,
   editingTabId,
   editingName,
   onSwitchTab,
@@ -169,6 +173,7 @@ export default function AppSidebar({
   onSelectOrganization,
   onSelectJobRole,
   onSelectPromptReference,
+  onSelectCriteria,
 }: AppSidebarProps) {
   const [isDragging, setIsDragging] = useState(false)
   const sensors = useSensors(
@@ -365,8 +370,63 @@ export default function AppSidebar({
                                             <span>Call Prompt</span>
                                           </button>
                                         </SidebarMenuSubButton>
+                                        <SidebarMenuSub>
+                                          {isLoadingCriteria ? (
+                                            <SidebarMenuSubItem>
+                                              <SidebarMenuSubButton asChild>
+                                                <button type="button" disabled>
+                                                  <ListChecks />
+                                                  <span>Loading criteria...</span>
+                                                </button>
+                                              </SidebarMenuSubButton>
+                                            </SidebarMenuSubItem>
+                                          ) : criteriaError ? (
+                                            <SidebarMenuSubItem>
+                                              <SidebarMenuSubButton asChild>
+                                                <button type="button" disabled>
+                                                  <ListChecks />
+                                                  <span>{criteriaError}</span>
+                                                </button>
+                                              </SidebarMenuSubButton>
+                                            </SidebarMenuSubItem>
+                                          ) : (criteriaByPromptId[reference.promptId] ?? []).length === 0 ? (
+                                            <SidebarMenuSubItem>
+                                              <SidebarMenuSubButton asChild>
+                                                <button type="button" disabled>
+                                                  <ListChecks />
+                                                  <span>No criteria found</span>
+                                                </button>
+                                              </SidebarMenuSubButton>
+                                            </SidebarMenuSubItem>
+                                          ) : (
+                                            (criteriaByPromptId[reference.promptId] ?? []).map((criteria) => (
+                                              <SidebarMenuSubItem key={`${reference.promptId}-${criteria.criteriaId}`}>
+                                                <SidebarMenuSubButton asChild>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => onSelectCriteria(criteria.criteriaId)}
+                                                    className="w-full text-left"
+                                                  >
+                                                    <ListChecks />
+                                                    <span>{criteria.criteriaName}</span>
+                                                  </button>
+                                                </SidebarMenuSubButton>
+                                              </SidebarMenuSubItem>
+                                            ))
+                                          )}
+                                        </SidebarMenuSub>
                                       </SidebarMenuSubItem>
                                     ))}
+                                    {criteriaImportError && (
+                                      <SidebarMenuSubItem>
+                                        <SidebarMenuSubButton asChild>
+                                          <button type="button" disabled>
+                                            <ListChecks />
+                                            <span>{criteriaImportError}</span>
+                                          </button>
+                                        </SidebarMenuSubButton>
+                                      </SidebarMenuSubItem>
+                                    )}
                                     {promptImportError && (
                                       <SidebarMenuSubItem>
                                         <SidebarMenuSubButton asChild>
