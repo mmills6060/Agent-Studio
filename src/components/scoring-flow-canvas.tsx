@@ -59,6 +59,7 @@ import { parseScoringPrompt, parseScoringPromptWithLLM } from "@/components/hand
 interface ScoringFlowCanvasRef {
   getState: () => { nodes: Node<ScoringNodeData>[]; edges: Edge[] }
   openImport: () => void
+  importPrompt: (rawText: string) => Promise<boolean>
   viewPrompt: () => void
   addBlock: (blockType: string) => void
   deselectAll: () => void
@@ -248,15 +249,45 @@ const ScoringFlow = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
     setIsImportOpen(true)
   }, [])
 
+  const importPromptText = useCallback(async (rawText: string) => {
+    const regexResult = parseScoringPrompt(rawText)
+
+    if (regexResult.nodes.length > 0) {
+      const hasAttributes = regexResult.nodes.some(
+        (n) => n.data.blockType === "scoring-attribute",
+      )
+      if (hasAttributes) {
+        setNodes(regexResult.nodes)
+        setEdges(regexResult.edges)
+        setImportText("")
+        setIsImportOpen(false)
+        setTimeout(() => fitView({ padding: 0.2 }), 50)
+        return true
+      }
+    }
+
+    const llmResult = await parseScoringPromptWithLLM(rawText)
+    if (llmResult.nodes.length === 0)
+      return false
+
+    setNodes(llmResult.nodes)
+    setEdges(llmResult.edges)
+    setImportText("")
+    setIsImportOpen(false)
+    setTimeout(() => fitView({ padding: 0.2 }), 50)
+    return true
+  }, [setNodes, setEdges, fitView])
+
   useImperativeHandle(ref, () => ({
     getState: () => ({ nodes: nodes as Node<ScoringNodeData>[], edges }),
     openImport: handleOpenImport,
+    importPrompt: async (rawText: string) => importPromptText(rawText),
     viewPrompt: handleRun,
     addBlock: handleAddBlock,
     deselectAll: () => {
       setNodes(nds => nds.map(n => n.selected ? { ...n, selected: false } : n))
     },
-  }), [nodes, edges, handleRun, handleAddBlock, handleOpenImport, setNodes])
+  }), [nodes, edges, importPromptText, handleRun, handleAddBlock, handleOpenImport, setNodes])
 
   const handleCopyPrompt = useCallback(async () => {
     await navigator.clipboard.writeText(generatedPrompt)
@@ -269,41 +300,16 @@ const ScoringFlow = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
     setIsImporting(true)
 
     try {
-      const regexResult = parseScoringPrompt(importText)
-
-      if (regexResult.nodes.length > 0) {
-        const hasAttributes = regexResult.nodes.some(
-          (n) => n.data.blockType === "scoring-attribute",
-        )
-        if (hasAttributes) {
-          setNodes(regexResult.nodes)
-          setEdges(regexResult.edges)
-          setImportText("")
-          setIsImportOpen(false)
-          setIsImporting(false)
-          setTimeout(() => fitView({ padding: 0.2 }), 50)
-          return
-        }
-      }
-
-      const llmResult = await parseScoringPromptWithLLM(importText)
-      if (llmResult.nodes.length === 0) {
+      const imported = await importPromptText(importText)
+      if (!imported) {
         setImportError("Could not parse the text. Make sure it contains recognizable scoring prompt sections.")
-        setIsImporting(false)
-        return
       }
-
-      setNodes(llmResult.nodes)
-      setEdges(llmResult.edges)
-      setImportText("")
-      setIsImportOpen(false)
-      setTimeout(() => fitView({ padding: 0.2 }), 50)
     } catch {
       setImportError("An error occurred while parsing the prompt. Check the format and try again.")
     } finally {
       setIsImporting(false)
     }
-  }, [importText, setNodes, setEdges, fitView])
+  }, [importText, importPromptText])
 
   const blockConfig = selectedNode
     ? getScoringBlockType(selectedNode.data.blockType)

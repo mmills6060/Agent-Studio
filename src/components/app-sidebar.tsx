@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Phone, FileText, ClipboardCheck, Plus, X, ChevronRight, Pencil, GripVertical } from "lucide-react"
+import { Phone, FileText, ClipboardCheck, Plus, X, ChevronRight, Pencil, GripVertical, Building2, BriefcaseBusiness, Hash } from "lucide-react"
 import {
   Collapsible,
   CollapsibleContent,
@@ -146,6 +146,16 @@ function SortableScoringTab({
 export default function AppSidebar({
   activeTab,
   scoringTabs,
+  organizations,
+  selectedOrganizationId,
+  jobRoles,
+  isLoadingJobRoles,
+  jobRolesError,
+  selectedJobRoleId,
+  promptReferences,
+  isLoadingPromptReferences,
+  promptReferencesError,
+  promptImportError,
   editingTabId,
   editingName,
   onSwitchTab,
@@ -156,6 +166,9 @@ export default function AppSidebar({
   onEditingNameChange,
   onRenameKeyDown,
   onReorderScoringTabs,
+  onSelectOrganization,
+  onSelectJobRole,
+  onSelectPromptReference,
 }: AppSidebarProps) {
   const [isDragging, setIsDragging] = useState(false)
   const sensors = useSensors(
@@ -245,6 +258,137 @@ export default function AppSidebar({
                 </CollapsibleContent>
               </SidebarMenuItem>
             </Collapsible>
+          </SidebarMenu>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>Organizations</SidebarGroupLabel>
+          <SidebarMenu>
+            {organizations.length === 0 ? (
+              <SidebarMenuItem>
+                <SidebarMenuButton disabled>
+                  <Building2 />
+                  <span>No organizations found</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ) : (
+              organizations.map((organization) => (
+                <SidebarMenuItem key={organization.orgId}>
+                  <SidebarMenuButton
+                    isActive={selectedOrganizationId === organization.orgId}
+                    onClick={() => onSelectOrganization(organization.orgId)}
+                  >
+                    <Building2 />
+                    <span>{organization.orgName}</span>
+                  </SidebarMenuButton>
+                  {selectedOrganizationId === organization.orgId && (
+                    <SidebarMenuSub>
+                      {isLoadingJobRoles ? (
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild>
+                            <button type="button" disabled>
+                              <BriefcaseBusiness />
+                              <span>Loading roles...</span>
+                            </button>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ) : jobRolesError ? (
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild>
+                            <button type="button" disabled>
+                              <BriefcaseBusiness />
+                              <span>{jobRolesError}</span>
+                            </button>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ) : jobRoles.length === 0 ? (
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild>
+                            <button type="button" disabled>
+                              <BriefcaseBusiness />
+                              <span>No roles found</span>
+                            </button>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ) : (
+                        jobRoles.map((jobRole) => (
+                          <SidebarMenuSubItem key={jobRole.roleId}>
+                            <SidebarMenuSubButton asChild>
+                              <button
+                                type="button"
+                                onClick={() => onSelectJobRole(jobRole.roleId)}
+                                className="w-full text-left"
+                              >
+                                <BriefcaseBusiness />
+                                <span>{jobRole.roleDescription}</span>
+                              </button>
+                            </SidebarMenuSubButton>
+                            {selectedJobRoleId === jobRole.roleId && (
+                              <SidebarMenuSub>
+                                {isLoadingPromptReferences ? (
+                                  <SidebarMenuSubItem>
+                                    <SidebarMenuSubButton asChild>
+                                      <button type="button" disabled>
+                                        <Hash />
+                                        <span>Loading prompt IDs...</span>
+                                      </button>
+                                    </SidebarMenuSubButton>
+                                  </SidebarMenuSubItem>
+                                ) : promptReferencesError ? (
+                                  <SidebarMenuSubItem>
+                                    <SidebarMenuSubButton asChild>
+                                      <button type="button" disabled>
+                                        <Hash />
+                                        <span>{promptReferencesError}</span>
+                                      </button>
+                                    </SidebarMenuSubButton>
+                                  </SidebarMenuSubItem>
+                                ) : promptReferences.length === 0 ? (
+                                  <SidebarMenuSubItem>
+                                    <SidebarMenuSubButton asChild>
+                                      <button type="button" disabled>
+                                        <Hash />
+                                        <span>No prompt IDs found</span>
+                                      </button>
+                                    </SidebarMenuSubButton>
+                                  </SidebarMenuSubItem>
+                                ) : (
+                                  <>
+                                    {promptReferences.map((reference) => (
+                                      <SidebarMenuSubItem key={reference.promptId}>
+                                        <SidebarMenuSubButton asChild>
+                                          <button
+                                            type="button"
+                                            onClick={() => onSelectPromptReference(reference.promptId)}
+                                            className="w-full text-left"
+                                          >
+                                            <Hash />
+                                            <span>Call Prompt</span>
+                                          </button>
+                                        </SidebarMenuSubButton>
+                                      </SidebarMenuSubItem>
+                                    ))}
+                                    {promptImportError && (
+                                      <SidebarMenuSubItem>
+                                        <SidebarMenuSubButton asChild>
+                                          <button type="button" disabled>
+                                            <Hash />
+                                            <span>{promptImportError}</span>
+                                          </button>
+                                        </SidebarMenuSubButton>
+                                      </SidebarMenuSubItem>
+                                    )}
+                                  </>
+                                )}
+                              </SidebarMenuSub>
+                            )}
+                          </SidebarMenuSubItem>
+                        ))
+                      )}
+                    </SidebarMenuSub>
+                  )}
+                </SidebarMenuItem>
+              ))
+            )}
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>

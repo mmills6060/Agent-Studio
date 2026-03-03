@@ -63,6 +63,7 @@ interface FlowCanvasRef {
   getPrompt: () => string
   getState: () => { nodes: Node<CustomNodeData>[]; edges: Edge[] }
   openImport: () => void
+  importPrompt: (rawText: string) => Promise<boolean>
   viewPrompt: () => void
   addBlock: (blockType: string) => void
   setState: (nodes: Node<CustomNodeData>[], edges: Edge[]) => void
@@ -474,10 +475,22 @@ const Flow = forwardRef<FlowCanvasRef, FlowCanvasProps>(function Flow(
     setIsOutputOpen(true)
   }, [nodes, edges])
 
+  const importPromptText = useCallback((rawText: string) => {
+    const { nodes: newNodes, edges: newEdges } = handleImportPrompt(rawText)
+    if (newNodes.length === 0) return false
+    setNodes(newNodes)
+    setEdges(newEdges)
+    setImportText("")
+    setIsImportOpen(false)
+    setTimeout(() => fitView({ padding: 0.2 }), 50)
+    return true
+  }, [setNodes, setEdges, fitView])
+
   useImperativeHandle(ref, () => ({
     getPrompt: () => generateSystemPrompt(nodes as Node<CustomNodeData>[], edges as Edge[]),
     getState: () => ({ nodes: nodes as Node<CustomNodeData>[], edges: edges as Edge[] }),
     openImport: () => setIsImportOpen(true),
+    importPrompt: async (rawText: string) => importPromptText(rawText),
     viewPrompt: handleRun,
     addBlock: handleAddBlock,
     setState: (newNodes: Node<CustomNodeData>[], newEdges: Edge[]) => {
@@ -488,7 +501,7 @@ const Flow = forwardRef<FlowCanvasRef, FlowCanvasProps>(function Flow(
     deselectAll: () => {
       setNodes(nds => nds.map(n => n.selected ? { ...n, selected: false } : n))
     },
-  }), [nodes, edges, handleRun, handleAddBlock, setNodes, setEdges, fitView])
+  }), [nodes, edges, importPromptText, handleRun, handleAddBlock, setNodes, setEdges, fitView])
 
   const handleCopyPrompt = useCallback(async () => {
     await navigator.clipboard.writeText(generatedPrompt)
@@ -497,14 +510,8 @@ const Flow = forwardRef<FlowCanvasRef, FlowCanvasProps>(function Flow(
   }, [generatedPrompt])
 
   const handleImport = useCallback(() => {
-    const { nodes: newNodes, edges: newEdges } = handleImportPrompt(importText)
-    if (newNodes.length === 0) return
-    setNodes(newNodes)
-    setEdges(newEdges)
-    setImportText("")
-    setIsImportOpen(false)
-    setTimeout(() => fitView({ padding: 0.2 }), 50)
-  }, [importText, setNodes, setEdges, fitView])
+    importPromptText(importText)
+  }, [importText, importPromptText])
 
   const blockConfig = selectedNode
     ? getBlockType(selectedNode.data.blockType)

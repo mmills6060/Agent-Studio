@@ -50,6 +50,7 @@ interface ContextFlowCanvasRef {
   getState: () => { nodes: Node<ContextNodeData>[]; edges: Edge[] }
   setState: (nodes: Node<ContextNodeData>[], edges: Edge[]) => void
   openImport: () => void
+  importPrompt: (rawText: string) => Promise<boolean>
   viewPrompt: () => void
   addBlock: (blockType: string) => void
   deselectAll: () => void
@@ -152,6 +153,17 @@ const ContextFlow = forwardRef<ContextFlowCanvasRef, ContextFlowCanvasProps>(
       setIsImportOpen(true)
     }, [])
 
+    const importPromptText = useCallback((rawText: string) => {
+      const { nodes: newNodes, edges: newEdges } = parseContextPromptToFlow(rawText)
+      if (newNodes.length === 0) return false
+      setNodes(newNodes)
+      setEdges(newEdges)
+      setImportText("")
+      setIsImportOpen(false)
+      setTimeout(() => fitView({ padding: 0.2 }), 50)
+      return true
+    }, [setNodes, setEdges, fitView])
+
     useImperativeHandle(
       ref,
       () => ({
@@ -167,6 +179,7 @@ const ContextFlow = forwardRef<ContextFlowCanvasRef, ContextFlowCanvasProps>(
           setTimeout(() => fitView({ padding: 0.2 }), 50)
         },
         openImport: handleOpenImport,
+        importPrompt: async (rawText: string) => importPromptText(rawText),
         viewPrompt: handleRun,
         addBlock: handleAddBlock,
         deselectAll: () => {
@@ -181,6 +194,7 @@ const ContextFlow = forwardRef<ContextFlowCanvasRef, ContextFlowCanvasProps>(
         handleRun,
         handleAddBlock,
         handleOpenImport,
+        importPromptText,
         setNodes,
         setEdges,
         fitView,
@@ -194,15 +208,8 @@ const ContextFlow = forwardRef<ContextFlowCanvasRef, ContextFlowCanvasProps>(
     }, [generatedPrompt])
 
     const handleImport = useCallback(() => {
-      const { nodes: newNodes, edges: newEdges } =
-        parseContextPromptToFlow(importText)
-      if (newNodes.length === 0) return
-      setNodes(newNodes)
-      setEdges(newEdges)
-      setImportText("")
-      setIsImportOpen(false)
-      setTimeout(() => fitView({ padding: 0.2 }), 50)
-    }, [importText, setNodes, setEdges, fitView])
+      importPromptText(importText)
+    }, [importText, importPromptText])
 
     const blockConfig = selectedNode
       ? getContextBlockType(selectedNode.data.blockType)

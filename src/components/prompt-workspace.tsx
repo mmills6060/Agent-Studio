@@ -53,13 +53,30 @@ import { Textarea } from "@/components/ui/textarea"
 import { DEFAULT_RESUME_JSON } from "@/lib/default-resume"
 import { runContextPrompt } from "@/components/handlers/context-prompt-run-handlers"
 import { testDatabaseConnection } from "@/components/handlers/database-connection-handlers"
+import { getJobRolesByOrganization } from "@/components/handlers/job-roles-handlers"
+import { getPromptReferencesByRole } from "@/components/handlers/prompt-references-handlers"
+import { getPromptStringById } from "@/components/handlers/prompt-string-handlers"
+import type { AppSidebarJobRole, AppSidebarOrganization, AppSidebarPromptReference } from "@/components/handlers/app-sidebar-handlers"
 
 const DEFAULT_RESUME_JSON_STRING = JSON.stringify(DEFAULT_RESUME_JSON, null, 2)
 
 const firstScoringTab = createScoringPromptTab()
 
-export default function PromptWorkspace() {
+interface PromptWorkspaceProps {
+  organizations: AppSidebarOrganization[]
+}
+
+export default function PromptWorkspace({ organizations }: PromptWorkspaceProps) {
   const [activeTab, setActiveTab] = useState<string>("call-prompt")
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState<string | null>(null)
+  const [jobRoles, setJobRoles] = useState<AppSidebarJobRole[]>([])
+  const [isLoadingJobRoles, setIsLoadingJobRoles] = useState(false)
+  const [jobRolesError, setJobRolesError] = useState<string | null>(null)
+  const [selectedJobRoleId, setSelectedJobRoleId] = useState<string | null>(null)
+  const [promptReferences, setPromptReferences] = useState<AppSidebarPromptReference[]>([])
+  const [isLoadingPromptReferences, setIsLoadingPromptReferences] = useState(false)
+  const [promptReferencesError, setPromptReferencesError] = useState<string | null>(null)
+  const [promptImportError, setPromptImportError] = useState<string | null>(null)
   const [scoringTabs, setScoringTabs] = useState<ScoringPromptTab[]>([firstScoringTab])
   const [currentScoringTabId, setCurrentScoringTabId] = useState(firstScoringTab.id)
   const [editingTabId, setEditingTabId] = useState<string | null>(null)
@@ -376,11 +393,84 @@ export default function PromptWorkspace() {
     [],
   )
 
+  const handleSelectOrganization = useCallback(async (orgId: string) => {
+    setSelectedOrganizationId(orgId)
+    setJobRoles([])
+    setSelectedJobRoleId(null)
+    setPromptReferences([])
+    setIsLoadingPromptReferences(false)
+    setPromptReferencesError(null)
+    setPromptImportError(null)
+    setIsLoadingJobRoles(true)
+    setJobRolesError(null)
+    try {
+      const roles = await getJobRolesByOrganization(orgId)
+      setJobRoles(roles)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to load job roles"
+      setJobRoles([])
+      setJobRolesError(message)
+    } finally {
+      setIsLoadingJobRoles(false)
+    }
+  }, [])
+
+  const handleSelectJobRole = useCallback(async (roleId: string) => {
+    setSelectedJobRoleId(roleId)
+    setPromptReferences([])
+    setIsLoadingPromptReferences(true)
+    setPromptReferencesError(null)
+    setPromptImportError(null)
+    try {
+      const references = await getPromptReferencesByRole(roleId)
+      setPromptReferences(references)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to load prompt IDs"
+      setPromptReferences([])
+      setPromptReferencesError(message)
+    } finally {
+      setIsLoadingPromptReferences(false)
+    }
+  }, [])
+
+  const importPromptToActiveCanvas = useCallback(async (rawText: string) => {
+    if (isCallPrompt)
+      return (await flowCanvasRef.current?.importPrompt(rawText)) ?? false
+
+    if (isContextPrompt)
+      return (await contextFlowCanvasRef.current?.importPrompt(rawText)) ?? false
+
+    return (await canvasRef.current?.importPrompt(rawText)) ?? false
+  }, [isCallPrompt, isContextPrompt])
+
+  const handleSelectPromptReference = useCallback(async (promptId: string) => {
+    setPromptImportError(null)
+    try {
+      const promptString = await getPromptStringById(promptId)
+      const imported = await importPromptToActiveCanvas(promptString)
+      if (!imported)
+        setPromptImportError("Prompt could not be parsed for the current tab")
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to import prompt"
+      setPromptImportError(message)
+    }
+  }, [importPromptToActiveCanvas])
+
   return (
     <SidebarProvider>
       <AppSidebar
         activeTab={activeTab}
         scoringTabs={scoringTabs}
+        organizations={organizations}
+        selectedOrganizationId={selectedOrganizationId}
+        jobRoles={jobRoles}
+        isLoadingJobRoles={isLoadingJobRoles}
+        jobRolesError={jobRolesError}
+        selectedJobRoleId={selectedJobRoleId}
+        promptReferences={promptReferences}
+        isLoadingPromptReferences={isLoadingPromptReferences}
+        promptReferencesError={promptReferencesError}
+        promptImportError={promptImportError}
         editingTabId={editingTabId}
         editingName={editingName}
         onSwitchTab={handleSwitchTab}
@@ -391,6 +481,9 @@ export default function PromptWorkspace() {
         onEditingNameChange={setEditingName}
         onRenameKeyDown={handleRenameKeyDown}
         onReorderScoringTabs={handleReorderScoringTabs}
+        onSelectOrganization={handleSelectOrganization}
+        onSelectJobRole={handleSelectJobRole}
+        onSelectPromptReference={handleSelectPromptReference}
       />
       <SidebarInset>
         <header className="flex h-10 items-center gap-2 px-2">
