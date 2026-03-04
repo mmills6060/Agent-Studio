@@ -21,7 +21,7 @@ import {
 import type { ScoringNodeData } from "@/components/handlers/scoring-flow-canvas-handlers"
 import { generateScoringPrompt } from "@/components/handlers/scoring-flow-canvas-handlers"
 import type { ContextNodeData } from "@/components/handlers/context-flow-canvas-handlers"
-import { Play, Upload, MessageSquare, BarChart3, Save, Check, Trash2, Wand2, PlayCircle, Square } from "lucide-react"
+import { Play, Upload, MessageSquare, BarChart3, Save, Check, Trash2, Wand2, PlayCircle, Square, UploadCloud } from "lucide-react"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
@@ -219,7 +219,8 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
 
   const [isSaved, setIsSaved] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [isSavingProduction, setIsSavingProduction] = useState(false)
+  const [isPublishing, setIsPublishing] = useState(false)
+  const [isPublished, setIsPublished] = useState(false)
   const [callProductionPromptId, setCallProductionPromptId] = useState<string | null>(null)
   const [scoringProductionPromptByTab, setScoringProductionPromptByTab] = useState<Record<string, string>>({})
 
@@ -230,12 +231,7 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
       : scoringProductionPromptByTab[activeTab] ?? null
   const isProductionPromptOpen = Boolean(activeProductionPromptId)
 
-  const handleSave = useCallback(async () => {
-    if (isSavingProduction)
-      return
-
-    setSaveError(null)
-    saveCurrentCanvasState()
+  const getWorkspaceState = useCallback(() => {
     const callPromptState = flowCanvasRef.current?.getState() ?? { nodes: [], edges: [] }
     const contextState =
       contextFlowCanvasRef.current?.getState() ?? contextPromptState
@@ -246,35 +242,13 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
       }
       return scoringTabs
     })()
+    return { callPromptState, contextState, latestScoringTabs }
+  }, [scoringTabs, activeTab, currentScoringTabId, isCallPrompt, isContextPrompt, contextPromptState])
 
-    if (activeProductionPromptId) {
-      let promptStringToSave = ""
-
-      if (isCallPrompt)
-        promptStringToSave = flowCanvasRef.current?.getPrompt() ?? ""
-      else {
-        const activeScoringTab = latestScoringTabs.find((tab) => tab.id === activeTab)
-        if (!activeScoringTab) {
-          setSaveError("Active scoring tab was not found")
-          return
-        }
-        promptStringToSave = generateScoringPrompt(activeScoringTab.nodes, activeScoringTab.edges)
-      }
-
-      setIsSavingProduction(true)
-      try {
-        await updatePromptStringById(activeProductionPromptId, promptStringToSave)
-        setIsSaved(true)
-        setTimeout(() => setIsSaved(false), 2000)
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Failed to update production prompt"
-        setSaveError(message)
-      } finally {
-        setIsSavingProduction(false)
-      }
-      return
-    }
-
+  const handleSave = useCallback(() => {
+    setSaveError(null)
+    saveCurrentCanvasState()
+    const { callPromptState, contextState, latestScoringTabs } = getWorkspaceState()
     const success = saveWorkspace({
       callPrompt: callPromptState,
       contextPrompt: contextState,
@@ -286,10 +260,49 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
       setSaveError("Failed to save workspace")
       return
     }
-
     setIsSaved(true)
     setTimeout(() => setIsSaved(false), 2000)
-  }, [saveCurrentCanvasState, scoringTabs, activeTab, currentScoringTabId, isCallPrompt, isContextPrompt, contextPromptState, isSavingProduction, activeProductionPromptId])
+  }, [saveCurrentCanvasState, getWorkspaceState, activeTab, currentScoringTabId])
+
+  const handlePublish = useCallback(async () => {
+    if (!activeProductionPromptId || isPublishing)
+      return
+
+    setSaveError(null)
+    saveCurrentCanvasState()
+    const { callPromptState, contextState, latestScoringTabs } = getWorkspaceState()
+    saveWorkspace({
+      callPrompt: callPromptState,
+      contextPrompt: contextState,
+      scoringTabs: latestScoringTabs,
+      activeTab,
+      currentScoringTabId,
+    })
+
+    let promptStringToSave = ""
+    if (isCallPrompt)
+      promptStringToSave = flowCanvasRef.current?.getPrompt() ?? ""
+    else {
+      const activeScoringTab = latestScoringTabs.find((tab) => tab.id === activeTab)
+      if (!activeScoringTab) {
+        setSaveError("Active scoring tab was not found")
+        return
+      }
+      promptStringToSave = generateScoringPrompt(activeScoringTab.nodes, activeScoringTab.edges)
+    }
+
+    setIsPublishing(true)
+    try {
+      await updatePromptStringById(activeProductionPromptId, promptStringToSave)
+      setIsPublished(true)
+      setTimeout(() => setIsPublished(false), 2000)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to update production prompt"
+      setSaveError(message)
+    } finally {
+      setIsPublishing(false)
+    }
+  }, [activeProductionPromptId, isPublishing, saveCurrentCanvasState, getWorkspaceState, isCallPrompt, activeTab, currentScoringTabId])
 
   const handleClear = useCallback(() => {
     clearWorkspace()
@@ -687,20 +700,23 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
               variant="outline"
               size="sm"
               onClick={handleSave}
-              disabled={isSavingProduction}
               className="gap-2"
             >
               {isSaved ? <Check className="size-4" /> : <Save className="size-4" />}
-              {isSavingProduction
-                ? "Updating..."
-                : isSaved
-                  ? isProductionPromptOpen
-                    ? "Updated!"
-                    : "Saved!"
-                  : isProductionPromptOpen
-                    ? "Update in Production"
-                    : "Save"}
+              {isSaved ? "Saved!" : "Save"}
             </Button>
+            {isProductionPromptOpen && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePublish}
+                disabled={isPublishing}
+                className="gap-2"
+              >
+                {isPublished ? <Check className="size-4" /> : <UploadCloud className="size-4" />}
+                {isPublishing ? "Publishing..." : isPublished ? "Published!" : "Publish"}
+              </Button>
+            )}
             {saveError && (
               <span className="text-xs text-destructive">{saveError}</span>
             )}

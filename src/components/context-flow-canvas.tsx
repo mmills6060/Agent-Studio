@@ -288,18 +288,12 @@ const ContextFlow = forwardRef<ContextFlowCanvasRef, ContextFlowCanvasProps>(
               </SheetDescription>
             </SheetHeader>
             <div className="flex min-h-0 flex-1 flex-col gap-4 px-4">
-              <div className="min-h-0 flex-1 overflow-auto rounded-md border bg-muted p-4">
-                <pre className="whitespace-pre-wrap text-sm text-foreground">
-                  {generatedPrompt ||
-                    "No content to display. Add blocks and configure them."}
-                </pre>
-              </div>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleCopyPrompt}
                 disabled={!generatedPrompt}
-                className="gap-2 self-end"
+                className="gap-2 self-end shrink-0"
               >
                 {isCopied ? (
                   <Check className="size-4" />
@@ -308,6 +302,12 @@ const ContextFlow = forwardRef<ContextFlowCanvasRef, ContextFlowCanvasProps>(
                 )}
                 {isCopied ? "Copied!" : "Copy to Clipboard"}
               </Button>
+              <div className="min-h-0 flex-1 overflow-auto rounded-md border bg-muted p-4">
+                <pre className="whitespace-pre-wrap text-sm text-foreground">
+                  {generatedPrompt ||
+                    "No content to display. Add blocks and configure them."}
+                </pre>
+              </div>
             </div>
           </SheetContent>
         </Sheet>

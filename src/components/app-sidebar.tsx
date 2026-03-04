@@ -471,25 +471,6 @@ export default function AppSidebar({
                                           </button>
                                         </SidebarMenuSubButton>
                                       </SidebarMenuSubItem>,
-                                      <SidebarMenuSubItem key={`create-criteria-${reference.promptId}`}>
-                                        <SidebarMenuSubButton asChild>
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              setCreateCriteriaError(null)
-                                              setCriteriaName("")
-                                              setMinScore("")
-                                              setMaxScore("")
-                                              setTargetPromptId(reference.promptId)
-                                              setIsCreateCriteriaOpen(true)
-                                            }}
-                                            className="w-full text-left"
-                                          >
-                                            <Plus />
-                                            <span>Create criteria node</span>
-                                          </button>
-                                        </SidebarMenuSubButton>
-                                      </SidebarMenuSubItem>,
                                       ...(isLoadingCriteria
                                         ? []
                                         : criteriaError
@@ -508,6 +489,25 @@ export default function AppSidebar({
                                                 </SidebarMenuSubButton>
                                               </SidebarMenuSubItem>
                                             ))),
+                                      <SidebarMenuSubItem key={`create-criteria-${reference.promptId}`}>
+                                        <SidebarMenuSubButton asChild>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setCreateCriteriaError(null)
+                                              setCriteriaName("")
+                                              setMinScore("")
+                                              setMaxScore("")
+                                              setTargetPromptId(reference.promptId)
+                                              setIsCreateCriteriaOpen(true)
+                                            }}
+                                            className="w-full text-left"
+                                          >
+                                            <Plus />
+                                            <span>Create scoring prompt</span>
+                                          </button>
+                                        </SidebarMenuSubButton>
+                                      </SidebarMenuSubItem>,
                                     ])}
                                     {isLoadingCriteria && (
                                       <SidebarMenuSubItem>
@@ -625,7 +625,7 @@ export default function AppSidebar({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create criteria node</DialogTitle>
+            <DialogTitle>Create scoring prompt</DialogTitle>
             <DialogDescription>
               Add a new criteria node to this prompt for the selected role.
             </DialogDescription>
@@ -676,7 +676,7 @@ export default function AppSidebar({
               Cancel
             </Button>
             <Button onClick={handleCreateCriteriaSubmit} disabled={isCreatingCriteriaNode}>
-              {isCreatingCriteriaNode ? "Creating..." : "Create criteria node"}
+              {isCreatingCriteriaNode ? "Creating..." : "Create scoring prompt"}
             </Button>
           </DialogFooter>
         </DialogContent>
