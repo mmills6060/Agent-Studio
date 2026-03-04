@@ -17,10 +17,54 @@ interface CreateJobRoleResponse {
   assessmentId: string
   assessmentInstanceId: string
   jobPositionId: string
+  promptId: string
   roleDescription: string
   assessmentInstanceName: string
   assessmentInstanceType: "JOB"
 }
+
+const defaultPromptAgentMetadata = JSON.stringify({
+  agent: "pipeline",
+  pipeline: {
+    llm: "google",
+    tts: "cartesia",
+    stt_keywords:
+      "Dispatch Health, Melissa, Nurse Practitioner, NP, telehealth, perimenopause, menopause, HRT, hormone replacement therapy, GLP-1, Wegovy, Ozempic, bio-identical pellets, oral progesterone, women's health, OB/GYN, primary care, prescriptive authority, board certification, compact license, multi-state license, disciplinary action, Google Workspace, Slack, EHR, AthenaHealth, Athena, Epic, Cerner, DrChrono, Kareo",
+    llmGoogleModel: "gemini-2.5-flash",
+    cartesia_voice_id: "b7d50908-b17c-442d-ad8d-810c63997ed9",
+    llmGoogleVertexAI: "true",
+    deepgram_stt_model: "nova-3",
+    llm_fallback_chain: [
+      { model: "gemini-2.5-flash", provider: "google" },
+      { model: "claude-haiku-4-5-20251001", provider: "anthropic" },
+    ],
+    tts_fallback_chain: [
+      { voice: "b7d50908-b17c-442d-ad8d-810c63997ed9", provider: "cartesia" },
+      { voice: "OYTbf65OHHFELVut7v2H", provider: "elevenlabs" },
+    ],
+    allow_interruptions: "false",
+    ttsElevenlabsVoiceId: "OYTbf65OHHFELVut7v2H",
+    max_endpointing_delay: "4.0",
+    min_endpointing_delay: "2.5",
+    llm_fallback_max_retry: "1",
+    ttsElevenlabsVoiceName: "Hope",
+    tts_fallback_max_retry: "2",
+    llmGoogleModelTemperature: "0.8",
+    llmGoogleVertexAILocation: "us-east4",
+    llmBeforeCallbackIsEnabled: "true",
+    llm_fallback_retry_interval: "1.0",
+    ttsElevenlabsVoiceStability: "0.71",
+    llm_fallback_attempt_timeout: "5.0",
+    deepgramSttRmsThresholdPreSquared: "0.016",
+    isEndCallOnAgentSpeechEventHandler: "true",
+    isEndCallOnAgentSpeechEventHandlerOnFarewellTerm: "true",
+  },
+  outbound_phone: {
+    voicemail_msg:
+      "Hi, this is Melissa, a virtual assistant calling on behalf of the recruitment team at Midi Health. I'm reaching out because you previously applied to the Nurse Practitioner Position with us. If you're interested, feel free to reply to the text message we just sent, or give us a call back at this number. Thanks, and I look forward to connecting with you soon!",
+    is_first_agent_utterance_interruptable: "true",
+  },
+})
 
 function parseStringValue(value: unknown): string {
   if (typeof value !== "string")
@@ -177,12 +221,57 @@ export async function POST(request: Request) {
           (RoleLink, RoleDescription, PositionIDs, OrgID, Status, RoleFile, RoleImage, RoleCode, isDemo, IsHidden)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
-      ["", roleDescription, "", orgId, "Active", "", "", "", 0, 0],
+      ["", roleDescription, "", orgId, "Active", "", "CallCenterRoleImageValpak.jpg", "", 0, 0],
     )
 
     const roleId = roleResult.insertId
     if (!roleId)
       throw new SqlQueryValidationError("Failed to create role", 502)
+
+    const promptResult = await executeSqlMutation(
+      `
+        INSERT INTO prodtake2ai.Prompts (PromptString, PromptType, AgentMetaData)
+        VALUES (?, ?, ?)
+      `,
+      ["", "Voice", defaultPromptAgentMetadata],
+    )
+
+    const promptId = promptResult.insertId
+    if (!promptId)
+      throw new SqlQueryValidationError("Failed to create prompt", 502)
+
+    const welcomeTaskResult = await executeSqlMutation(
+      `
+        INSERT INTO prodtake2ai.Tasks (PromptID, CriteriaIDs, TaskModality, TaskSubModality)
+        VALUES (?, ?, ?, ?)
+      `,
+      [null, "", "Welcome", ""],
+    )
+
+    const welcomeTaskId = welcomeTaskResult.insertId
+    if (!welcomeTaskId)
+      throw new SqlQueryValidationError("Failed to create welcome task", 502)
+
+    const phoneCallTaskResult = await executeSqlMutation(
+      `
+        INSERT INTO prodtake2ai.Tasks (PromptID, CriteriaIDs, TaskModality, TaskSubModality)
+        VALUES (?, ?, ?, ?)
+      `,
+      [promptId, "", "Phone Call", "Outbound Phone Call"],
+    )
+
+    const phoneCallTaskId = phoneCallTaskResult.insertId
+    if (!phoneCallTaskId)
+      throw new SqlQueryValidationError("Failed to create phone call task", 502)
+
+    await executeSqlMutation(
+      `
+        UPDATE prodtake2ai.Assessments
+        SET Tasks = ?
+        WHERE AssessmentID = ?
+      `,
+      [`${welcomeTaskId},${phoneCallTaskId}`, assessmentId],
+    )
 
     const jobPositionResult = await executeSqlMutation(
       `
@@ -211,6 +300,7 @@ export async function POST(request: Request) {
       assessmentId: String(assessmentId),
       assessmentInstanceId: String(assessmentInstanceId),
       jobPositionId: String(jobPositionId),
+      promptId: String(promptId),
       roleDescription,
       assessmentInstanceName,
       assessmentInstanceType: "JOB",
