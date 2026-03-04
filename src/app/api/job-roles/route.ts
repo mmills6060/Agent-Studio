@@ -67,6 +67,13 @@ const defaultPromptAgentMetadata = JSON.stringify({
   },
 })
 
+const defaultPhoneCallTaskMedia = JSON.stringify({
+  image: "Valpak - Phone Call Image.png",
+  videos: ["Valpak - Phone Call Cold.mp4"],
+  thumbnails: ["Valpak - Phone Call Cold-Thumbnail.png"],
+  profile_pic: "Valpak_Call_Bot_Profile_Pic_Samantha.png",
+})
+
 function parseStringValue(value: unknown): string {
   if (typeof value !== "string")
     return ""
@@ -263,10 +270,10 @@ export async function POST(request: Request) {
 
     const phoneCallTaskResult = await executeSqlMutation(
       `
-        INSERT INTO prodtake2ai.Tasks (PromptID, CriteriaIDs, TaskModality, TaskSubModality)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO prodtake2ai.Tasks (PromptID, CriteriaIDs, TaskDescription, TaskMedia, TaskModality, TaskSubModality)
+        VALUES (?, ?, ?, ?, ?, ?)
       `,
-      [promptId, "", "Phone Call", "Outbound Phone Call"],
+      [promptId, "", "{}", defaultPhoneCallTaskMedia, "Phone Call", "OutboundPhoneCall"],
     )
 
     const phoneCallTaskId = phoneCallTaskResult.insertId
