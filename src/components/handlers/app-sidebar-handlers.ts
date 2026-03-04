@@ -34,6 +34,7 @@ interface AppSidebarProps {
   promptReferencesError: string | null
   criteriaByPromptId: Record<string, AppSidebarCriteria[]>
   isLoadingCriteria: boolean
+  isCreatingCriteriaNode: boolean
   criteriaError: string | null
   promptImportError: string | null
   criteriaImportError: string | null
@@ -52,6 +53,7 @@ interface AppSidebarProps {
   onSelectJobRole: (roleId: string) => void
   onSelectPromptReference: (promptId: string) => void
   onSelectCriteria: (criteriaId: string) => void
+  onCreateCriteriaNode: (promptId: string, criteriaName: string, minScore: number, maxScore: number) => Promise<void>
 }
 
 export type {

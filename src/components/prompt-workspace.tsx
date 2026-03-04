@@ -57,6 +57,7 @@ import { createJobRole, getJobRolesByOrganization } from "@/components/handlers/
 import { getPromptReferencesByRole } from "@/components/handlers/prompt-references-handlers"
 import { getPromptStringById } from "@/components/handlers/prompt-string-handlers"
 import { getCriteriaByRole } from "@/components/handlers/role-criteria-handlers"
+import { createCriteriaNode } from "@/components/handlers/create-criteria-node-handlers"
 import type { AppSidebarCriteria, AppSidebarJobRole, AppSidebarOrganization, AppSidebarPromptReference } from "@/components/handlers/app-sidebar-handlers"
 
 const DEFAULT_RESUME_JSON_STRING = JSON.stringify(DEFAULT_RESUME_JSON, null, 2)
@@ -80,6 +81,7 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
   const [promptReferencesError, setPromptReferencesError] = useState<string | null>(null)
   const [criteriaByPromptId, setCriteriaByPromptId] = useState<Record<string, AppSidebarCriteria[]>>({})
   const [isLoadingCriteria, setIsLoadingCriteria] = useState(false)
+  const [isCreatingCriteriaNode, setIsCreatingCriteriaNode] = useState(false)
   const [criteriaError, setCriteriaError] = useState<string | null>(null)
   const [promptImportError, setPromptImportError] = useState<string | null>(null)
   const [criteriaImportError, setCriteriaImportError] = useState<string | null>(null)
@@ -488,6 +490,51 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
     }
   }, [currentScoringTabId])
 
+  const handleCreateCriteriaNode = useCallback(async (
+    promptId: string,
+    criteriaName: string,
+    minScore: number,
+    maxScore: number,
+  ) => {
+    const roleId = selectedJobRoleId?.trim() ?? ""
+    if (!roleId)
+      throw new Error("Select a role before creating criteria")
+
+    const trimmedCriteriaName = criteriaName.trim()
+    if (!trimmedCriteriaName)
+      throw new Error("Criteria name is required")
+
+    if (!Number.isFinite(minScore))
+      throw new Error("Min score is required")
+
+    if (!Number.isFinite(maxScore))
+      throw new Error("Max score is required")
+
+    if (minScore > maxScore)
+      throw new Error("Min score must be less than or equal to max score")
+
+    setIsCreatingCriteriaNode(true)
+    setCriteriaError(null)
+    setCriteriaImportError(null)
+    try {
+      await createCriteriaNode({
+        roleId,
+        promptId,
+        criteriaName: trimmedCriteriaName,
+        minScore,
+        maxScore,
+      })
+      const criteria = await getCriteriaByRole(roleId)
+      setCriteriaByPromptId(criteria)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to create criteria node"
+      setCriteriaError(message)
+      throw error
+    } finally {
+      setIsCreatingCriteriaNode(false)
+    }
+  }, [selectedJobRoleId])
+
   return (
     <SidebarProvider>
       <AppSidebar
@@ -505,6 +552,7 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
         promptReferencesError={promptReferencesError}
         criteriaByPromptId={criteriaByPromptId}
         isLoadingCriteria={isLoadingCriteria}
+        isCreatingCriteriaNode={isCreatingCriteriaNode}
         criteriaError={criteriaError}
         promptImportError={promptImportError}
         criteriaImportError={criteriaImportError}
@@ -523,6 +571,7 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
         onSelectJobRole={handleSelectJobRole}
         onSelectPromptReference={handleSelectPromptReference}
         onSelectCriteria={handleSelectCriteria}
+        onCreateCriteriaNode={handleCreateCriteriaNode}
       />
       <SidebarInset>
         <header className="flex h-10 items-center gap-2 px-2">

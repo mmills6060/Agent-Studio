@@ -168,6 +168,7 @@ export default function AppSidebar({
   promptReferencesError,
   criteriaByPromptId,
   isLoadingCriteria,
+  isCreatingCriteriaNode,
   criteriaError,
   promptImportError,
   criteriaImportError,
@@ -186,11 +187,18 @@ export default function AppSidebar({
   onSelectJobRole,
   onSelectPromptReference,
   onSelectCriteria,
+  onCreateCriteriaNode,
 }: AppSidebarProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [isCreateRoleOpen, setIsCreateRoleOpen] = useState(false)
   const [assessmentInstanceName, setAssessmentInstanceName] = useState("")
   const [createRoleError, setCreateRoleError] = useState<string | null>(null)
+  const [isCreateCriteriaOpen, setIsCreateCriteriaOpen] = useState(false)
+  const [criteriaName, setCriteriaName] = useState("")
+  const [minScore, setMinScore] = useState("")
+  const [maxScore, setMaxScore] = useState("")
+  const [targetPromptId, setTargetPromptId] = useState<string | null>(null)
+  const [createCriteriaError, setCreateCriteriaError] = useState<string | null>(null)
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -218,6 +226,50 @@ export default function AppSidebar({
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to create role"
       setCreateRoleError(message)
+    }
+  }
+
+  async function handleCreateCriteriaSubmit() {
+    const promptId = targetPromptId?.trim() ?? ""
+    if (!promptId) {
+      setCreateCriteriaError("Prompt ID is required")
+      return
+    }
+
+    const trimmedCriteriaName = criteriaName.trim()
+    if (!trimmedCriteriaName) {
+      setCreateCriteriaError("Criteria name is required")
+      return
+    }
+
+    const parsedMinScore = Number(minScore.trim())
+    if (!Number.isFinite(parsedMinScore)) {
+      setCreateCriteriaError("Min score is required")
+      return
+    }
+
+    const parsedMaxScore = Number(maxScore.trim())
+    if (!Number.isFinite(parsedMaxScore)) {
+      setCreateCriteriaError("Max score is required")
+      return
+    }
+
+    if (parsedMinScore > parsedMaxScore) {
+      setCreateCriteriaError("Min score must be less than or equal to max score")
+      return
+    }
+
+    setCreateCriteriaError(null)
+    try {
+      await onCreateCriteriaNode(promptId, trimmedCriteriaName, parsedMinScore, parsedMaxScore)
+      setCriteriaName("")
+      setMinScore("")
+      setMaxScore("")
+      setTargetPromptId(null)
+      setIsCreateCriteriaOpen(false)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to create criteria node"
+      setCreateCriteriaError(message)
     }
   }
 
@@ -419,6 +471,25 @@ export default function AppSidebar({
                                           </button>
                                         </SidebarMenuSubButton>
                                       </SidebarMenuSubItem>,
+                                      <SidebarMenuSubItem key={`create-criteria-${reference.promptId}`}>
+                                        <SidebarMenuSubButton asChild>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setCreateCriteriaError(null)
+                                              setCriteriaName("")
+                                              setMinScore("")
+                                              setMaxScore("")
+                                              setTargetPromptId(reference.promptId)
+                                              setIsCreateCriteriaOpen(true)
+                                            }}
+                                            className="w-full text-left"
+                                          >
+                                            <Plus />
+                                            <span>Create criteria node</span>
+                                          </button>
+                                        </SidebarMenuSubButton>
+                                      </SidebarMenuSubItem>,
                                       ...(isLoadingCriteria
                                         ? []
                                         : criteriaError
@@ -535,6 +606,77 @@ export default function AppSidebar({
             </Button>
             <Button onClick={handleCreateRoleSubmit} disabled={isCreatingJobRole}>
               {isCreatingJobRole ? "Creating..." : "Create role"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={isCreateCriteriaOpen}
+        onOpenChange={(open) => {
+          setIsCreateCriteriaOpen(open)
+          if (!open) {
+            setCreateCriteriaError(null)
+            setCriteriaName("")
+            setMinScore("")
+            setMaxScore("")
+            setTargetPromptId(null)
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create criteria node</DialogTitle>
+            <DialogDescription>
+              Add a new criteria node to this prompt for the selected role.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2">
+            <label htmlFor="criteria-node-name" className="text-sm font-medium text-foreground">
+              Criteria name
+            </label>
+            <Input
+              id="criteria-node-name"
+              value={criteriaName}
+              onChange={(event) => setCriteriaName(event.target.value)}
+              placeholder="e.g. Clinical confidence"
+              disabled={isCreatingCriteriaNode}
+            />
+            <label htmlFor="criteria-node-min-score" className="text-sm font-medium text-foreground">
+              Min score
+            </label>
+            <Input
+              id="criteria-node-min-score"
+              type="number"
+              value={minScore}
+              onChange={(event) => setMinScore(event.target.value)}
+              placeholder="e.g. 0"
+              disabled={isCreatingCriteriaNode}
+            />
+            <label htmlFor="criteria-node-max-score" className="text-sm font-medium text-foreground">
+              Max score
+            </label>
+            <Input
+              id="criteria-node-max-score"
+              type="number"
+              value={maxScore}
+              onChange={(event) => setMaxScore(event.target.value)}
+              placeholder="e.g. 10"
+              disabled={isCreatingCriteriaNode}
+            />
+            {createCriteriaError && (
+              <p className="text-sm text-destructive">{createCriteriaError}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsCreateCriteriaOpen(false)}
+              disabled={isCreatingCriteriaNode}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleCreateCriteriaSubmit} disabled={isCreatingCriteriaNode}>
+              {isCreatingCriteriaNode ? "Creating..." : "Create criteria node"}
             </Button>
           </DialogFooter>
         </DialogContent>
