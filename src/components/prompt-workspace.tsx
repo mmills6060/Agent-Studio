@@ -728,7 +728,7 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
               <Upload className="size-4" />
               Import
             </Button>
-            <Button size="sm" onClick={handleViewPrompt} className="gap-2">
+            <Button variant="outline" size="sm" onClick={handleViewPrompt} className="gap-2">
               <Play className="size-4" />
               View prompt
             </Button>
