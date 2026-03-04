@@ -19,6 +19,7 @@ import {
   type ScoringPromptTab,
 } from "@/components/handlers/scoring-prompt-manager-handlers"
 import type { ScoringNodeData } from "@/components/handlers/scoring-flow-canvas-handlers"
+import { generateScoringPrompt } from "@/components/handlers/scoring-flow-canvas-handlers"
 import type { ContextNodeData } from "@/components/handlers/context-flow-canvas-handlers"
 import { Play, Upload, MessageSquare, BarChart3, Save, Check, Trash2, Wand2, PlayCircle, Square } from "lucide-react"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
@@ -56,6 +57,7 @@ import { getCriteriaScoringPromptById } from "@/components/handlers/criteria-sco
 import { createJobRole, getJobRolesByOrganization } from "@/components/handlers/job-roles-handlers"
 import { getPromptReferencesByRole } from "@/components/handlers/prompt-references-handlers"
 import { getPromptStringById } from "@/components/handlers/prompt-string-handlers"
+import { updatePromptStringById } from "@/components/handlers/update-prompt-string-handlers"
 import { getCriteriaByRole } from "@/components/handlers/role-criteria-handlers"
 import { createCriteriaNode } from "@/components/handlers/create-criteria-node-handlers"
 import type { AppSidebarCriteria, AppSidebarJobRole, AppSidebarOrganization, AppSidebarPromptReference } from "@/components/handlers/app-sidebar-handlers"
@@ -150,6 +152,11 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
       saveCurrentCanvasState()
       const updated = deleteScoringPromptTab(scoringTabs, tabId)
       setScoringTabs(updated)
+      setScoringProductionPromptByTab((prev) => {
+        const next = { ...prev }
+        delete next[tabId]
+        return next
+      })
       const deletedIndex = scoringTabs.findIndex((t) => t.id === tabId)
       const nextTab = updated[Math.min(deletedIndex, updated.length - 1)]
       if (activeTab === tabId) setActiveTab(nextTab.id)
@@ -211,8 +218,23 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
   }, [saveCurrentCanvasState])
 
   const [isSaved, setIsSaved] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [isSavingProduction, setIsSavingProduction] = useState(false)
+  const [callProductionPromptId, setCallProductionPromptId] = useState<string | null>(null)
+  const [scoringProductionPromptByTab, setScoringProductionPromptByTab] = useState<Record<string, string>>({})
 
-  const handleSave = useCallback(() => {
+  const activeProductionPromptId = isCallPrompt
+    ? callProductionPromptId
+    : isContextPrompt
+      ? null
+      : scoringProductionPromptByTab[activeTab] ?? null
+  const isProductionPromptOpen = Boolean(activeProductionPromptId)
+
+  const handleSave = useCallback(async () => {
+    if (isSavingProduction)
+      return
+
+    setSaveError(null)
     saveCurrentCanvasState()
     const callPromptState = flowCanvasRef.current?.getState() ?? { nodes: [], edges: [] }
     const contextState =
@@ -224,6 +246,35 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
       }
       return scoringTabs
     })()
+
+    if (activeProductionPromptId) {
+      let promptStringToSave = ""
+
+      if (isCallPrompt)
+        promptStringToSave = flowCanvasRef.current?.getPrompt() ?? ""
+      else {
+        const activeScoringTab = latestScoringTabs.find((tab) => tab.id === activeTab)
+        if (!activeScoringTab) {
+          setSaveError("Active scoring tab was not found")
+          return
+        }
+        promptStringToSave = generateScoringPrompt(activeScoringTab.nodes, activeScoringTab.edges)
+      }
+
+      setIsSavingProduction(true)
+      try {
+        await updatePromptStringById(activeProductionPromptId, promptStringToSave)
+        setIsSaved(true)
+        setTimeout(() => setIsSaved(false), 2000)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to update production prompt"
+        setSaveError(message)
+      } finally {
+        setIsSavingProduction(false)
+      }
+      return
+    }
+
     const success = saveWorkspace({
       callPrompt: callPromptState,
       contextPrompt: contextState,
@@ -231,11 +282,14 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
       activeTab,
       currentScoringTabId,
     })
-    if (success) {
-      setIsSaved(true)
-      setTimeout(() => setIsSaved(false), 2000)
+    if (!success) {
+      setSaveError("Failed to save workspace")
+      return
     }
-  }, [saveCurrentCanvasState, scoringTabs, activeTab, currentScoringTabId, isCallPrompt, isContextPrompt, contextPromptState])
+
+    setIsSaved(true)
+    setTimeout(() => setIsSaved(false), 2000)
+  }, [saveCurrentCanvasState, scoringTabs, activeTab, currentScoringTabId, isCallPrompt, isContextPrompt, contextPromptState, isSavingProduction, activeProductionPromptId])
 
   const handleClear = useCallback(() => {
     clearWorkspace()
@@ -248,6 +302,9 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
     setActiveTab("call-prompt")
     setConversationMessages([])
     setConversationPrompt("")
+    setCallProductionPromptId(null)
+    setScoringProductionPromptByTab({})
+    setSaveError(null)
   }, [])
 
   useEffect(() => {
@@ -457,40 +514,41 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
     }
   }, [selectedOrganizationId])
 
-  const importPromptToActiveCanvas = useCallback(async (rawText: string) => {
-    if (isCallPrompt)
-      return (await flowCanvasRef.current?.importPrompt(rawText)) ?? false
-
-    if (isContextPrompt)
-      return (await contextFlowCanvasRef.current?.importPrompt(rawText)) ?? false
-
-    return (await canvasRef.current?.importPrompt(rawText)) ?? false
-  }, [isCallPrompt, isContextPrompt])
-
   const handleSelectPromptReference = useCallback(async (promptId: string) => {
     setPromptImportError(null)
     setCriteriaImportError(null)
+    setSaveError(null)
     try {
       const promptString = await getPromptStringById(promptId)
-      const imported = await importPromptToActiveCanvas(promptString)
+      const imported = (await flowCanvasRef.current?.importPrompt(promptString)) ?? false
       if (!imported)
         setPromptImportError("Prompt could not be parsed for the current tab")
+      else {
+        setActiveTab("call-prompt")
+        setCallProductionPromptId(promptId)
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to import prompt"
       setPromptImportError(message)
     }
-  }, [importPromptToActiveCanvas])
+  }, [])
 
-  const handleSelectCriteria = useCallback(async (criteriaId: string) => {
+  const handleSelectCriteria = useCallback(async (criteriaId: string, promptId: string) => {
     setCriteriaImportError(null)
     setPromptImportError(null)
+    setSaveError(null)
     try {
       const scoringPrompt = await getCriteriaScoringPromptById(criteriaId)
       const imported = (await canvasRef.current?.importPrompt(scoringPrompt)) ?? false
       if (!imported)
         setCriteriaImportError("Scoring prompt could not be parsed")
-      else
+      else {
+        setScoringProductionPromptByTab((prev) => ({
+          ...prev,
+          [currentScoringTabId]: promptId,
+        }))
         setActiveTab(currentScoringTabId)
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to import scoring prompt"
       setCriteriaImportError(message)
@@ -625,10 +683,27 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-            <Button variant="outline" size="sm" onClick={handleSave} className="gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSave}
+              disabled={isSavingProduction}
+              className="gap-2"
+            >
               {isSaved ? <Check className="size-4" /> : <Save className="size-4" />}
-              {isSaved ? "Saved!" : "Save"}
+              {isSavingProduction
+                ? "Updating..."
+                : isSaved
+                  ? isProductionPromptOpen
+                    ? "Updated!"
+                    : "Saved!"
+                  : isProductionPromptOpen
+                    ? "Update in Production"
+                    : "Save"}
             </Button>
+            {saveError && (
+              <span className="text-xs text-destructive">{saveError}</span>
+            )}
             <Button variant="outline" size="sm" onClick={() => setIsWizardOpen(true)} className="gap-2">
               <Wand2 className="size-4" />
               Wizard

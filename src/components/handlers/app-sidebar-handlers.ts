@@ -52,7 +52,7 @@ interface AppSidebarProps {
   onCreateJobRole: (assessmentInstanceName: string) => Promise<void>
   onSelectJobRole: (roleId: string) => void
   onSelectPromptReference: (promptId: string) => void
-  onSelectCriteria: (criteriaId: string) => void
+  onSelectCriteria: (criteriaId: string, promptId: string) => void
   onCreateCriteriaNode: (promptId: string, criteriaName: string, minScore: number, maxScore: number) => Promise<void>
 }
 

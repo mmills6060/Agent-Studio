@@ -499,7 +499,7 @@ export default function AppSidebar({
                                                 <SidebarMenuSubButton asChild>
                                                   <button
                                                     type="button"
-                                                    onClick={() => onSelectCriteria(criteria.criteriaId)}
+                                                    onClick={() => onSelectCriteria(criteria.criteriaId, reference.promptId)}
                                                     className="w-full text-left"
                                                   >
                                                     <ListChecks />
