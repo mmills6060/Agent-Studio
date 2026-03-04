@@ -13,7 +13,25 @@ interface CreateJobRoleInput {
 
 interface CreateJobRoleResponse {
   roleId?: string
+  assessmentId?: string
+  assessmentInstanceId?: string
+  jobPositionId?: string
+  promptId?: string
+  roleDescription?: string
+  assessmentInstanceName?: string
+  assessmentInstanceType?: "JOB"
   error?: string
+}
+
+interface CreatedJobRole {
+  roleId: string
+  assessmentId: string | null
+  assessmentInstanceId: string | null
+  jobPositionId: string | null
+  promptId: string | null
+  roleDescription: string | null
+  assessmentInstanceName: string | null
+  assessmentInstanceType: "JOB" | null
 }
 
 function parseJobRole(row: Record<string, unknown>): AppSidebarJobRole | null {
@@ -50,7 +68,7 @@ export async function getJobRolesByOrganization(orgId: string): Promise<AppSideb
     .filter((role): role is AppSidebarJobRole => role !== null)
 }
 
-export async function createJobRole(input: CreateJobRoleInput): Promise<string | null> {
+export async function createJobRole(input: CreateJobRoleInput & { promptString?: string }): Promise<CreatedJobRole> {
   const response = await fetch("/api/job-roles", {
     method: "POST",
     headers: {
@@ -70,7 +88,16 @@ export async function createJobRole(input: CreateJobRoleInput): Promise<string |
     throw new Error(body?.error ?? "Failed to create job role")
 
   if (typeof body?.roleId !== "string")
-    return null
+    throw new Error("Created role ID is missing from response")
 
-  return body.roleId
+  return {
+    roleId: body.roleId,
+    assessmentId: typeof body.assessmentId === "string" ? body.assessmentId : null,
+    assessmentInstanceId: typeof body.assessmentInstanceId === "string" ? body.assessmentInstanceId : null,
+    jobPositionId: typeof body.jobPositionId === "string" ? body.jobPositionId : null,
+    promptId: typeof body.promptId === "string" ? body.promptId : null,
+    roleDescription: typeof body.roleDescription === "string" ? body.roleDescription : null,
+    assessmentInstanceName: typeof body.assessmentInstanceName === "string" ? body.assessmentInstanceName : null,
+    assessmentInstanceType: body.assessmentInstanceType === "JOB" ? "JOB" : null,
+  }
 }

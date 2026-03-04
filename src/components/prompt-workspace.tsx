@@ -343,7 +343,7 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
   )
 
   const handleWizardComplete = useCallback(
-    (result: WizardResult) => {
+    async (result: WizardResult) => {
       flowCanvasRef.current?.setState(
         result.callPrompt.nodes,
         result.callPrompt.edges,
@@ -363,6 +363,14 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
       }
 
       setActiveTab("call-prompt")
+
+      if (!result.persisted)
+        return
+
+      const roles = await getJobRolesByOrganization(result.persisted.organizationId)
+      setJobRoles(roles)
+      setSelectedOrganizationId(result.persisted.organizationId)
+      setSelectedJobRoleId(result.persisted.roleId)
     },
     [],
   )
@@ -435,7 +443,7 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
     setIsCreatingJobRole(true)
     setJobRolesError(null)
     try {
-      const createdRoleId = await createJobRole({
+      const createdRole = await createJobRole({
         orgId,
         roleDescription: trimmedAssessmentName,
         assessmentInstanceName: trimmedAssessmentName,
@@ -443,8 +451,7 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
 
       const roles = await getJobRolesByOrganization(orgId)
       setJobRoles(roles)
-      if (createdRoleId)
-        setSelectedJobRoleId(createdRoleId)
+      setSelectedJobRoleId(createdRole.roleId)
     } finally {
       setIsCreatingJobRole(false)
     }
@@ -693,6 +700,8 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
           isOpen={isWizardOpen}
           onOpenChange={setIsWizardOpen}
           onComplete={handleWizardComplete}
+          organizations={organizations}
+          defaultOrganizationId={selectedOrganizationId}
         />
 
         <Sheet open={isContextRunOpen} onOpenChange={setIsContextRunOpen}>

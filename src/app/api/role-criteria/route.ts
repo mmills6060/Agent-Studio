@@ -1,3 +1,4 @@
+import OpenAI from "openai"
 import { NextResponse } from "next/server"
 
 import {
@@ -206,6 +207,7 @@ interface CreateRoleCriteriaRequest {
   criteriaName?: unknown
   minScore?: unknown
   maxScore?: unknown
+  scoringPrompt?: unknown
 }
 
 interface TaskRow {
@@ -231,11 +233,80 @@ function parseNumberValue(value: unknown): number | null {
   return parsedValue
 }
 
-async function insertIndicatorNode(
+function buildFallbackIndicatorDescription(
   criteriaName: string,
   minScore: number,
   maxScore: number,
+): string {
+  return `Evaluates overall performance for "${criteriaName}" on a ${minScore} to ${maxScore} scale based on evidence shown in the interview conversation.`
+}
+
+async function generateIndicatorDescription(
+  criteriaName: string,
+  minScore: number,
+  maxScore: number,
+  scoringPrompt: string,
+): Promise<string> {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey)
+    return buildFallbackIndicatorDescription(criteriaName, minScore, maxScore)
+
+  try {
+    const openai = new OpenAI({ apiKey })
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      temperature: 0.3,
+      messages: [
+        {
+          role: "system",
+          content: "You write concise interview scoring indicator descriptions.",
+        },
+        {
+          role: "user",
+          content: `Write one sentence (max 35 words) describing this scoring indicator.
+
+Criteria name: ${criteriaName}
+Score range: ${minScore} to ${maxScore}
+Scoring prompt context:
+${scoringPrompt || "(not provided)"}
+
+Return only the sentence.`,
+        },
+      ],
+    })
+
+    const description = completion.choices[0]?.message?.content?.trim() ?? ""
+    if (!description)
+      return buildFallbackIndicatorDescription(criteriaName, minScore, maxScore)
+
+    return description
+  } catch {
+    return buildFallbackIndicatorDescription(criteriaName, minScore, maxScore)
+  }
+}
+
+async function insertIndicatorNode(
+  criteriaName: string,
+  indicatorDescription: string,
+  minScore: number,
+  maxScore: number,
 ) : Promise<string> {
+  try {
+    const indicatorResult = await executeSqlMutation(
+      `
+        INSERT INTO prodtake2ai.Indicators
+          (IndicatorName, IndicatorDescription, MinValidScore, MaxValidScore)
+        VALUES (?, ?, ?, ?)
+      `,
+      [criteriaName, indicatorDescription, minScore, maxScore],
+    )
+    const indicatorId = indicatorResult.insertId
+    if (indicatorId)
+      return String(indicatorId)
+  } catch {
+    // Try a schema variant without IndicatorDescription when it's not present.
+  }
+
   try {
     const indicatorResult = await executeSqlMutation(
       `
@@ -249,7 +320,23 @@ async function insertIndicatorNode(
     if (indicatorId)
       return String(indicatorId)
   } catch {
-    // Try a schema variant without IndicatorName when it's not present.
+    // Try schema variants without IndicatorName.
+  }
+
+  try {
+    const indicatorResult = await executeSqlMutation(
+      `
+        INSERT INTO prodtake2ai.Indicators
+          (IndicatorDescription, MinValidScore, MaxValidScore)
+        VALUES (?, ?, ?)
+      `,
+      [indicatorDescription, minScore, maxScore],
+    )
+    const indicatorId = indicatorResult.insertId
+    if (indicatorId)
+      return String(indicatorId)
+  } catch {
+    // Final fallback when only min/max are supported.
   }
 
   const fallbackIndicatorResult = await executeSqlMutation(
@@ -271,6 +358,7 @@ async function linkTaskCriteriaIndicator(
   taskId: string,
   criteriaId: string,
   indicatorId: string,
+  scoringPrompt: string,
 ) {
   try {
     await executeSqlMutation(
@@ -279,7 +367,7 @@ async function linkTaskCriteriaIndicator(
           (TaskID, CriteriaID, IndicatorID, ScoringPrompt)
         VALUES (?, ?, ?, ?)
       `,
-      [taskId, criteriaId, indicatorId, ""],
+      [taskId, criteriaId, indicatorId, scoringPrompt],
     )
     return
   } catch {
@@ -312,6 +400,7 @@ export async function POST(request: Request) {
   const criteriaName = parseStringValue(body.criteriaName)
   const minScore = parseNumberValue(body.minScore)
   const maxScore = parseNumberValue(body.maxScore)
+  const scoringPrompt = parseStringValue(body.scoringPrompt)
 
   if (!roleId)
     return NextResponse.json(
@@ -441,21 +530,39 @@ export async function POST(request: Request) {
         { status: 404 },
       )
 
-    const criteriaResult = await executeSqlMutation(
-      `
-        INSERT INTO prodtake2ai.Criteria (CriteriaName)
-        VALUES (?)
-      `,
-      [criteriaName],
-    )
+    let criteriaResult
+    try {
+      criteriaResult = await executeSqlMutation(
+        `
+          INSERT INTO prodtake2ai.Criteria (CriteriaName, CriteriaDescription)
+          VALUES (?, ?)
+        `,
+        [criteriaName, criteriaName],
+      )
+    } catch {
+      criteriaResult = await executeSqlMutation(
+        `
+          INSERT INTO prodtake2ai.Criteria (CriteriaName)
+          VALUES (?)
+        `,
+        [criteriaName],
+      )
+    }
 
     const criteriaId = criteriaResult.insertId
     if (!criteriaId)
       throw new SqlQueryValidationError("Failed to create criteria", 502)
 
     const createdCriteriaId = String(criteriaId)
+    const indicatorDescription = await generateIndicatorDescription(
+      criteriaName,
+      minScore,
+      maxScore,
+      scoringPrompt,
+    )
     const indicatorId = await insertIndicatorNode(
       criteriaName,
+      indicatorDescription,
       minScore,
       maxScore,
     )
@@ -487,7 +594,7 @@ export async function POST(request: Request) {
         [[...mergedCriteriaIds].join(","), taskId],
       )
 
-      await linkTaskCriteriaIndicator(taskId, createdCriteriaId, indicatorId)
+      await linkTaskCriteriaIndicator(taskId, createdCriteriaId, indicatorId, scoringPrompt)
     }
 
     return NextResponse.json({
@@ -495,6 +602,7 @@ export async function POST(request: Request) {
       criteriaName,
       promptId,
       indicatorId,
+      indicatorDescription,
       minScore,
       maxScore,
     })

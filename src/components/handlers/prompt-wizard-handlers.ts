@@ -1,8 +1,10 @@
 import Papa from "papaparse"
 import type { Node, Edge } from "@xyflow/react"
-import { createTypedBlock, coerceToString, type CustomNodeData } from "./flow-canvas-handlers"
-import { createScoringBlock, type ScoringNodeData } from "./scoring-flow-canvas-handlers"
+import { createTypedBlock, coerceToString, generateSystemPrompt, type CustomNodeData } from "./flow-canvas-handlers"
+import { createScoringBlock, generateScoringPrompt, type ScoringNodeData } from "./scoring-flow-canvas-handlers"
 import { generateAttributeKeys } from "./scoring-prompt-generation-handlers"
+import { createJobRole } from "./job-roles-handlers"
+import { createCriteriaNode } from "./create-criteria-node-handlers"
 
 interface SpreadsheetRow {
   category: string
@@ -22,6 +24,7 @@ interface WizardConfig {
   roleTitle: string
   aboutCompany: string
   aboutRole: string
+  selectedOrganizationId: string | null
   categories: CategoryGroup[]
 }
 
@@ -45,11 +48,26 @@ interface WizardScoringResult {
   tabName: string
   nodes: Node<ScoringNodeData>[]
   edges: Edge[]
+  criteriaDefinition: WizardCriteriaDefinition
+}
+
+interface WizardCriteriaDefinition {
+  criteriaName: string
+  minScore: number
+  maxScore: number
+}
+
+interface WizardPersistenceResult {
+  organizationId: string
+  roleId: string
+  promptId: string
 }
 
 interface WizardResult {
   callPrompt: WizardCallPromptResult
   scoringPrompts: WizardScoringResult[]
+  persisted: WizardPersistenceResult | null
+  persistenceError: string | null
 }
 
 const REQUIRED_COLUMNS = ["category", "question", "points", "scoring guidance"]
@@ -413,10 +431,73 @@ function buildScoringForCategory(
     })
   }
 
+  const categoryMaxScore = category.questions.reduce((total, question) => {
+    const boundedPoints = Number.isFinite(question.points) ? Math.max(0, question.points) : 0
+    return total + boundedPoints
+  }, 0)
+  const criteriaDefinition = {
+    criteriaName: buildCriteriaName(category.name),
+    minScore: 0,
+    maxScore: categoryMaxScore,
+  }
+
   return {
     tabName: `${category.name} Scoring`,
     nodes: allNodes,
     edges,
+    criteriaDefinition,
+  }
+}
+
+function buildCriteriaName(categoryName: string): string {
+  const compactCategoryName = categoryName.trim() || "Category"
+  if (compactCategoryName.length <= 120)
+    return compactCategoryName
+  return compactCategoryName.slice(0, 117) + "..."
+}
+
+async function persistWizardArtifacts(
+  config: WizardConfig,
+  result: Omit<WizardResult, "persisted">,
+  onProgress?: (step: string) => void,
+): Promise<WizardPersistenceResult> {
+  const organizationId = config.selectedOrganizationId?.trim() ?? ""
+  if (!organizationId)
+    throw new Error("Organization selection is required for persistence")
+
+  onProgress?.("Saving role and call prompt under selected organization...")
+  const callPromptString = generateSystemPrompt(result.callPrompt.nodes, result.callPrompt.edges)
+  const createdRole = await createJobRole({
+    orgId: organizationId,
+    roleDescription: config.roleTitle.trim(),
+    assessmentInstanceName: config.roleTitle.trim(),
+    promptString: callPromptString,
+  })
+
+  const roleId = createdRole.roleId
+  const promptId = createdRole.promptId
+  if (!promptId)
+    throw new Error("Created role is missing promptId")
+
+  for (let categoryIndex = 0; categoryIndex < result.scoringPrompts.length; categoryIndex++) {
+    const scoringPrompt = result.scoringPrompts[categoryIndex]
+    const scoringPromptText = generateScoringPrompt(scoringPrompt.nodes, scoringPrompt.edges)
+    onProgress?.(`Saving scoring criteria for "${config.categories[categoryIndex]?.name ?? scoringPrompt.tabName}"...`)
+
+    await createCriteriaNode({
+      roleId,
+      promptId,
+      criteriaName: scoringPrompt.criteriaDefinition.criteriaName,
+      minScore: scoringPrompt.criteriaDefinition.minScore,
+      maxScore: scoringPrompt.criteriaDefinition.maxScore,
+      scoringPrompt: scoringPromptText,
+    })
+  }
+
+  return {
+    organizationId,
+    roleId,
+    promptId,
   }
 }
 
@@ -473,7 +554,23 @@ async function runWizard(
     scoringPrompts.push(buildScoringForCategory(cat, catContent, attributeKeys))
   }
 
-  return { callPrompt, scoringPrompts }
+  const generatedResult = { callPrompt, scoringPrompts }
+  if (!config.selectedOrganizationId)
+    return { ...generatedResult, persisted: null, persistenceError: null }
+
+  onProgress?.("Persisting generated prompts to selected organization...")
+  try {
+    const persisted = await persistWizardArtifacts(config, generatedResult, onProgress)
+    onProgress?.("Generation and persistence complete")
+    return { ...generatedResult, persisted, persistenceError: null }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown persistence error"
+    return {
+      ...generatedResult,
+      persisted: null,
+      persistenceError: `Generated successfully, but could not save to organization: ${message}`,
+    }
+  }
 }
 
 export { parseCSV, groupByCategory, runWizard }

@@ -10,6 +10,7 @@ interface CreateJobRoleRequest {
   orgId?: unknown
   roleDescription?: unknown
   assessmentInstanceName?: unknown
+  promptString?: unknown
 }
 
 interface CreateJobRoleResponse {
@@ -73,6 +74,13 @@ function parseStringValue(value: unknown): string {
   return value.trim()
 }
 
+function parseRawStringValue(value: unknown): string {
+  if (typeof value !== "string")
+    return ""
+
+  return value
+}
+
 function parseDelimitedIds(value: unknown): string[] {
   if (typeof value !== "string")
     return []
@@ -134,6 +142,7 @@ export async function POST(request: Request) {
   const orgId = parseStringValue(body.orgId)
   const roleDescription = parseStringValue(body.roleDescription)
   const assessmentInstanceName = parseStringValue(body.assessmentInstanceName)
+  const promptString = parseRawStringValue(body.promptString)
 
   if (!orgId)
     return NextResponse.json(
@@ -233,7 +242,7 @@ export async function POST(request: Request) {
         INSERT INTO prodtake2ai.Prompts (PromptString, PromptType, AgentMetaData)
         VALUES (?, ?, ?)
       `,
-      ["", "Voice", defaultPromptAgentMetadata],
+      [promptString, "Voice", defaultPromptAgentMetadata],
     )
 
     const promptId = promptResult.insertId

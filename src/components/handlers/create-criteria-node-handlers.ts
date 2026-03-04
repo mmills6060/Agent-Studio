@@ -4,6 +4,7 @@ interface CreateCriteriaNodeInput {
   criteriaName: string
   minScore: number
   maxScore: number
+  scoringPrompt?: string
 }
 
 interface CreateCriteriaNodeResponse {

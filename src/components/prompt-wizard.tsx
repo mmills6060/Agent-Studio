@@ -14,17 +14,27 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   parseCSV,
   groupByCategory,
   runWizard,
   type CategoryGroup,
   type WizardResult,
 } from "@/components/handlers/prompt-wizard-handlers"
+import type { AppSidebarOrganization } from "@/components/handlers/app-sidebar-handlers"
 
 interface PromptWizardProps {
   isOpen: boolean
   onOpenChange: (open: boolean) => void
   onComplete: (result: WizardResult) => void
+  organizations: AppSidebarOrganization[]
+  defaultOrganizationId: string | null
 }
 
 const STEPS = ["Upload CSV", "Interview Details", "Review & Generate"] as const
@@ -33,6 +43,8 @@ export default function PromptWizard({
   isOpen,
   onOpenChange,
   onComplete,
+  organizations,
+  defaultOrganizationId,
 }: PromptWizardProps) {
   const [currentStep, setCurrentStep] = useState(0)
   const [categories, setCategories] = useState<CategoryGroup[]>([])
@@ -43,6 +55,7 @@ export default function PromptWizard({
   const [roleTitle, setRoleTitle] = useState("")
   const [aboutCompany, setAboutCompany] = useState("")
   const [aboutRole, setAboutRole] = useState("")
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState(defaultOrganizationId ?? "")
   const [isGenerating, setIsGenerating] = useState(false)
   const [progressMessage, setProgressMessage] = useState("")
   const [generateError, setGenerateError] = useState("")
@@ -61,11 +74,12 @@ export default function PromptWizard({
     setRoleTitle("")
     setAboutCompany("")
     setAboutRole("")
+    setSelectedOrganizationId(defaultOrganizationId ?? "")
     setIsGenerating(false)
     setProgressMessage("")
     setGenerateError("")
     setIsDragOver(false)
-  }, [])
+  }, [defaultOrganizationId])
 
   const handleOpenChange = useCallback(
     (open: boolean) => {
@@ -145,11 +159,16 @@ export default function PromptWizard({
           roleTitle: roleTitle.trim(),
           aboutCompany: aboutCompany.trim(),
           aboutRole: aboutRole.trim(),
+          selectedOrganizationId: selectedOrganizationId.trim() || null,
           categories,
         },
         setProgressMessage,
       )
       onComplete(result)
+      if (result.persistenceError) {
+        setGenerateError(result.persistenceError)
+        return
+      }
       handleOpenChange(false)
     } catch (err) {
       setGenerateError(err instanceof Error ? err.message : "Generation failed")
@@ -157,7 +176,17 @@ export default function PromptWizard({
       setIsGenerating(false)
       setProgressMessage("")
     }
-  }, [interviewerName, companyName, roleTitle, aboutCompany, aboutRole, categories, onComplete, handleOpenChange])
+  }, [
+    interviewerName,
+    companyName,
+    roleTitle,
+    aboutCompany,
+    aboutRole,
+    selectedOrganizationId,
+    categories,
+    onComplete,
+    handleOpenChange,
+  ])
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
@@ -293,6 +322,31 @@ export default function PromptWizard({
               </div>
 
               <div className="flex flex-col gap-2">
+                <label htmlFor="wizard-organization" className="text-sm font-medium text-foreground">
+                  Organization (optional)
+                </label>
+                <Select
+                  value={selectedOrganizationId || "__none__"}
+                  onValueChange={(value) => setSelectedOrganizationId(value === "__none__" ? "" : value)}
+                >
+                  <SelectTrigger id="wizard-organization">
+                    <SelectValue placeholder="Do not save under an organization" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Do not save under an organization</SelectItem>
+                    {organizations.map((organization) => (
+                      <SelectItem key={organization.orgId} value={organization.orgId}>
+                        {organization.orgName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  If selected, the wizard will also create a role, call prompt, and scoring criteria under this organization.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2">
                 <label htmlFor="wizard-company" className="text-sm font-medium text-foreground">
                   Company Name
                 </label>
@@ -362,6 +416,10 @@ export default function PromptWizard({
                   <span className="text-foreground font-medium">{interviewerName}</span>
                   <span className="text-muted-foreground">Company</span>
                   <span className="text-foreground font-medium">{companyName}</span>
+                  <span className="text-muted-foreground">Organization</span>
+                  <span className="text-foreground font-medium">
+                    {organizations.find((organization) => organization.orgId === selectedOrganizationId)?.orgName ?? "Not selected"}
+                  </span>
                   <span className="text-muted-foreground">Role</span>
                   <span className="text-foreground font-medium">{roleTitle}</span>
                   <span className="text-muted-foreground">About Company</span>
