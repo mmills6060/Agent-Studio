@@ -21,7 +21,7 @@ import {
 import type { ScoringNodeData } from "@/components/handlers/scoring-flow-canvas-handlers"
 import { generateScoringPrompt } from "@/components/handlers/scoring-flow-canvas-handlers"
 import type { ContextNodeData } from "@/components/handlers/context-flow-canvas-handlers"
-import { Play, Upload, MessageSquare, BarChart3, Save, Check, Trash2, Wand2, PlayCircle, Square, UploadCloud } from "lucide-react"
+import { Play, Upload, MessageSquare, BarChart3, Save, Check, Trash2, Wand2, PlayCircle, Square, UploadCloud, Loader2 } from "lucide-react"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
@@ -105,6 +105,7 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
   const [contextRunResult, setContextRunResult] = useState<string | null>(null)
   const [contextRunError, setContextRunError] = useState<string | null>(null)
   const [isContextRunning, setIsContextRunning] = useState(false)
+  const [isLoadingPromptIntoCanvas, setIsLoadingPromptIntoCanvas] = useState(false)
   const contextRunAbortRef = useRef<AbortController | null>(null)
   const canvasRef = useRef<ScoringFlowCanvasRef>(null)
   const flowCanvasRef = useRef<FlowCanvasRef>(null)
@@ -531,6 +532,7 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
     setPromptImportError(null)
     setCriteriaImportError(null)
     setSaveError(null)
+    setIsLoadingPromptIntoCanvas(true)
     try {
       const promptString = await getPromptStringById(promptId)
       const imported = (await flowCanvasRef.current?.importPrompt(promptString)) ?? false
@@ -543,6 +545,8 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to import prompt"
       setPromptImportError(message)
+    } finally {
+      setIsLoadingPromptIntoCanvas(false)
     }
   }, [])
 
@@ -550,6 +554,7 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
     setCriteriaImportError(null)
     setPromptImportError(null)
     setSaveError(null)
+    setIsLoadingPromptIntoCanvas(true)
     try {
       const scoringPrompt = await getCriteriaScoringPromptById(criteriaId)
       const imported = (await canvasRef.current?.importPrompt(scoringPrompt)) ?? false
@@ -565,6 +570,8 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to import scoring prompt"
       setCriteriaImportError(message)
+    } finally {
+      setIsLoadingPromptIntoCanvas(false)
     }
   }, [currentScoringTabId])
 
@@ -769,6 +776,12 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
               initialEdges={scoringTabToRender.edges}
             />
           </div>
+          {isLoadingPromptIntoCanvas && (
+            <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-background/80 backdrop-blur-sm">
+              <Loader2 className="size-8 animate-spin text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Loading prompt into canvas…</p>
+            </div>
+          )}
         </div>
 
         <ConversationPanel
