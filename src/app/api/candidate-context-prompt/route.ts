@@ -6,6 +6,11 @@ import {
   SqlQueryValidationError,
 } from "@/lib/database"
 
+interface UpdateContextPromptRequest {
+  promptId?: unknown
+  prompt?: unknown
+}
+
 interface CreateContextPromptRequest {
   taskId?: unknown
   prompt?: unknown
@@ -101,6 +106,11 @@ Conditions
 function parseStringValue(value: unknown): string {
   if (typeof value !== "string") return ""
   return value.trim()
+}
+
+function parseRawStringValue(value: unknown): string {
+  if (typeof value !== "string") return ""
+  return value
 }
 
 function parseTaskId(value: unknown): number | null {
@@ -212,6 +222,61 @@ export async function POST(request: Request) {
     const message = err instanceof Error ? err.message : "Unknown error"
     return NextResponse.json(
       { error: `Context prompt creation failed: ${message}` },
+      { status: 502 },
+    )
+  }
+}
+
+export async function PATCH(request: Request) {
+  let body: UpdateContextPromptRequest
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json(
+      { error: "Invalid request body" },
+      { status: 400 },
+    )
+  }
+
+  const promptId = parseStringValue(body.promptId)
+  const prompt = parseRawStringValue(body.prompt)
+
+  if (!promptId)
+    return NextResponse.json(
+      { error: "promptId is required" },
+      { status: 400 },
+    )
+
+  try {
+    const now = new Date().toISOString().slice(0, 19).replace("T", " ")
+
+    const result = await executeSqlMutation(
+      `
+        UPDATE prodtake2ai.PromptsToGenerateContextForCandidate
+        SET Prompt = ?, UpdatedAt = ?
+        WHERE PromptId = ?
+        LIMIT 1
+      `,
+      [prompt, now, promptId],
+    )
+
+    if (result.affectedRows === 0)
+      return NextResponse.json(
+        { error: "Context prompt not found" },
+        { status: 404 },
+      )
+
+    return NextResponse.json({ promptId })
+  } catch (err) {
+    if (err instanceof SqlQueryValidationError)
+      return NextResponse.json(
+        { error: err.message },
+        { status: err.statusCode },
+      )
+
+    const message = err instanceof Error ? err.message : "Unknown error"
+    return NextResponse.json(
+      { error: `Context prompt update failed: ${message}` },
       { status: 502 },
     )
   }

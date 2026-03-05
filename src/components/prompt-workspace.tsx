@@ -53,9 +53,9 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { DEFAULT_RESUME_JSON } from "@/lib/default-resume"
 import { runContextPrompt } from "@/components/handlers/context-prompt-run-handlers"
-import { getCriteriaScoringPromptById } from "@/components/handlers/criteria-scoring-prompt-handlers"
+import { getCriteriaScoringPromptById, updateCriteriaScoringPrompt } from "@/components/handlers/criteria-scoring-prompt-handlers"
 import { createJobRole, getJobRolesByOrganization } from "@/components/handlers/job-roles-handlers"
-import { getCandidateContextPrompt } from "@/components/handlers/candidate-context-prompt-handlers"
+import { getCandidateContextPrompt, updateCandidateContextPrompt } from "@/components/handlers/candidate-context-prompt-handlers"
 import { getPromptReferencesByRole } from "@/components/handlers/prompt-references-handlers"
 import { getPromptStringById } from "@/components/handlers/prompt-string-handlers"
 import { updatePromptStringById } from "@/components/handlers/update-prompt-string-handlers"
@@ -225,11 +225,12 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
     if (isLoadingAllRolePrompts) return
     setIsLoadingAllRolePrompts(true)
     try {
-      const { tabs } = await loadAllRoleScoringPrompts(criteriaByPromptId)
+      const { tabs, criteriaByTabId } = await loadAllRoleScoringPrompts(criteriaByPromptId)
       if (tabs.length === 0) return
       setScoringTabs(tabs)
       setCurrentScoringTabId(tabs[0].id)
       setActiveTab(tabs[0].id)
+      setScoringProductionCriteriaByTab(criteriaByTabId)
     } finally {
       setIsLoadingAllRolePrompts(false)
     }
@@ -240,12 +241,14 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
   const [isPublishing, setIsPublishing] = useState(false)
   const [isPublished, setIsPublished] = useState(false)
   const [callProductionPromptId, setCallProductionPromptId] = useState<string | null>(null)
+  const [contextProductionPromptId, setContextProductionPromptId] = useState<string | null>(null)
   const [scoringProductionPromptByTab, setScoringProductionPromptByTab] = useState<Record<string, string>>({})
+  const [scoringProductionCriteriaByTab, setScoringProductionCriteriaByTab] = useState<Record<string, string>>({})
 
   const activeProductionPromptId = isCallPrompt
     ? callProductionPromptId
     : isContextPrompt
-      ? null
+      ? contextProductionPromptId
       : scoringProductionPromptByTab[activeTab] ?? null
   const isProductionPromptOpen = Boolean(activeProductionPromptId)
 
@@ -297,21 +300,30 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
       currentScoringTabId,
     })
 
-    let promptStringToSave = ""
-    if (isCallPrompt)
-      promptStringToSave = flowCanvasRef.current?.getPrompt() ?? ""
-    else {
-      const activeScoringTab = latestScoringTabs.find((tab) => tab.id === activeTab)
-      if (!activeScoringTab) {
-        setSaveError("Active scoring tab was not found")
-        return
-      }
-      promptStringToSave = generateScoringPrompt(activeScoringTab.nodes, activeScoringTab.edges)
-    }
-
     setIsPublishing(true)
     try {
-      await updatePromptStringById(activeProductionPromptId, promptStringToSave)
+      if (isCallPrompt) {
+        const promptStringToSave = flowCanvasRef.current?.getPrompt() ?? ""
+        await updatePromptStringById(activeProductionPromptId, promptStringToSave)
+      } else if (isContextPrompt) {
+        const promptStringToSave = contextFlowCanvasRef.current?.getPrompt() ?? ""
+        await updateCandidateContextPrompt(activeProductionPromptId, promptStringToSave)
+      } else {
+        const activeScoringTab = latestScoringTabs.find((tab) => tab.id === activeTab)
+        if (!activeScoringTab) {
+          setSaveError("Active scoring tab was not found")
+          setIsPublishing(false)
+          return
+        }
+        const criteriaId = scoringProductionCriteriaByTab[activeTab]
+        if (!criteriaId) {
+          setSaveError("No criteria associated with this scoring tab")
+          setIsPublishing(false)
+          return
+        }
+        const promptStringToSave = generateScoringPrompt(activeScoringTab.nodes, activeScoringTab.edges)
+        await updateCriteriaScoringPrompt(criteriaId, promptStringToSave)
+      }
       setIsPublished(true)
       setTimeout(() => setIsPublished(false), 2000)
     } catch (error) {
@@ -320,7 +332,7 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
     } finally {
       setIsPublishing(false)
     }
-  }, [activeProductionPromptId, isPublishing, saveCurrentCanvasState, getWorkspaceState, isCallPrompt, activeTab, currentScoringTabId])
+  }, [activeProductionPromptId, isPublishing, saveCurrentCanvasState, getWorkspaceState, isCallPrompt, isContextPrompt, activeTab, currentScoringTabId, scoringProductionCriteriaByTab])
 
   const handleClear = useCallback(() => {
     clearWorkspace()
@@ -334,7 +346,9 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
     setConversationMessages([])
     setConversationPrompt("")
     setCallProductionPromptId(null)
+    setContextProductionPromptId(null)
     setScoringProductionPromptByTab({})
+    setScoringProductionCriteriaByTab({})
     setSaveError(null)
   }, [])
 
@@ -523,6 +537,7 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
     }
 
     if (contextPromptId) {
+      setContextProductionPromptId(contextPromptId)
       try {
         const promptText = await getCandidateContextPrompt(contextPromptId)
         if (promptText) {
@@ -535,6 +550,8 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
       } catch {
         // Context prompt fetch is best-effort; don't block role selection
       }
+    } else {
+      setContextProductionPromptId(null)
     }
   }, [jobRoles])
 
@@ -600,6 +617,10 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
         setScoringProductionPromptByTab((prev) => ({
           ...prev,
           [currentScoringTabId]: promptId,
+        }))
+        setScoringProductionCriteriaByTab((prev) => ({
+          ...prev,
+          [currentScoringTabId]: criteriaId,
         }))
         setActiveTab(currentScoringTabId)
       }

@@ -48,6 +48,29 @@ export async function getCandidateContextPrompt(promptId: string): Promise<strin
   return typeof rows[0].Prompt === "string" ? rows[0].Prompt : null
 }
 
+interface UpdateContextPromptResponse {
+  promptId?: string
+  error?: string
+}
+
+export async function updateCandidateContextPrompt(promptId: string, prompt: string): Promise<void> {
+  const response = await fetch("/api/candidate-context-prompt", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ promptId, prompt }),
+  })
+
+  let body: UpdateContextPromptResponse | null = null
+  try {
+    body = await response.json()
+  } catch {
+    body = null
+  }
+
+  if (!response.ok)
+    throw new Error(body?.error ?? "Failed to update context prompt")
+}
+
 export async function createCandidateContextPrompt(input: CreateContextPromptInput): Promise<CreatedContextPrompt> {
   const response = await fetch("/api/candidate-context-prompt", {
     method: "POST",

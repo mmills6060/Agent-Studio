@@ -290,10 +290,10 @@ export async function POST(request: Request) {
 
     const phoneCallTaskResult = await executeSqlMutation(
       `
-        INSERT INTO prodtake2ai.Tasks (PromptID, CriteriaIDs, TaskDescription, TaskMedia, TaskModality, TaskSubModality)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO prodtake2ai.Tasks (PromptID, CriteriaIDs, TaskDescription, TaskMedia, TaskModality, TaskSubModality, shouldGenerateContextForCandidate)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `,
-      [promptId, "", "{}", defaultPhoneCallTaskMedia, "Phone Call", "OutboundPhoneCall"],
+      [promptId, "", "{}", defaultPhoneCallTaskMedia, "Phone Call", "OutboundPhoneCall", 1],
     )
 
     const phoneCallTaskId = phoneCallTaskResult.insertId

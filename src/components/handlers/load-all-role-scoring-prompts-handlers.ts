@@ -5,6 +5,7 @@ import type { AppSidebarCriteria } from "@/components/handlers/app-sidebar-handl
 
 interface LoadAllResult {
   tabs: ScoringPromptTab[]
+  criteriaByTabId: Record<string, string>
   errors: { criteriaName: string; error: string }[]
 }
 
@@ -14,7 +15,7 @@ export async function loadAllRoleScoringPrompts(
   const allCriteria = Object.values(criteriaByPromptId).flat()
 
   if (allCriteria.length === 0)
-    return { tabs: [], errors: [] }
+    return { tabs: [], criteriaByTabId: {}, errors: [] }
 
   const results = await Promise.allSettled(
     allCriteria.map(async (criteria) => {
@@ -23,16 +24,18 @@ export async function loadAllRoleScoringPrompts(
       const tab = createScoringPromptTab(criteria.criteriaName)
       tab.nodes = nodes
       tab.edges = edges
-      return tab
+      return { tab, criteriaId: criteria.criteriaId }
     }),
   )
 
   const tabs: ScoringPromptTab[] = []
+  const criteriaByTabId: Record<string, string> = {}
   const errors: { criteriaName: string; error: string }[] = []
 
   results.forEach((result, index) => {
     if (result.status === "fulfilled") {
-      tabs.push(result.value)
+      tabs.push(result.value.tab)
+      criteriaByTabId[result.value.tab.id] = result.value.criteriaId
     } else {
       const criteria = allCriteria[index]
       errors.push({
@@ -42,5 +45,5 @@ export async function loadAllRoleScoringPrompts(
     }
   })
 
-  return { tabs, errors }
+  return { tabs, criteriaByTabId, errors }
 }
