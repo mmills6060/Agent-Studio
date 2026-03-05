@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useRef, useState } from "react"
-import { Upload, ArrowLeft, ArrowRight, Sparkles, FileSpreadsheet, AlertCircle, MessageSquare } from "lucide-react"
+import { Upload, ArrowLeft, ArrowRight, Sparkles, FileSpreadsheet, AlertCircle, MessageSquare, FileText } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -58,6 +58,7 @@ export default function PromptWizard({
   const [aboutRole, setAboutRole] = useState("")
   const [selectedOrganizationId, setSelectedOrganizationId] = useState(defaultOrganizationId ?? "")
   const [createTexts, setCreateTexts] = useState(false)
+  const [createContextPrompt, setCreateContextPrompt] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [progressMessage, setProgressMessage] = useState("")
   const [generateError, setGenerateError] = useState("")
@@ -78,6 +79,7 @@ export default function PromptWizard({
     setAboutRole("")
     setSelectedOrganizationId(defaultOrganizationId ?? "")
     setCreateTexts(false)
+    setCreateContextPrompt(false)
     setIsGenerating(false)
     setProgressMessage("")
     setGenerateError("")
@@ -165,6 +167,7 @@ export default function PromptWizard({
           selectedOrganizationId: selectedOrganizationId.trim() || null,
           categories,
           createTexts,
+          createContextPrompt,
         },
         setProgressMessage,
       )
@@ -189,6 +192,7 @@ export default function PromptWizard({
     selectedOrganizationId,
     categories,
     createTexts,
+    createContextPrompt,
     onComplete,
     handleOpenChange,
   ])
@@ -335,7 +339,10 @@ export default function PromptWizard({
                   onValueChange={(value) => {
                     const newOrgId = value === "__none__" ? "" : value
                     setSelectedOrganizationId(newOrgId)
-                    if (!newOrgId) setCreateTexts(false)
+                    if (!newOrgId) {
+                      setCreateTexts(false)
+                      setCreateContextPrompt(false)
+                    }
                   }}
                 >
                   <SelectTrigger id="wizard-organization">
@@ -377,6 +384,32 @@ export default function PromptWizard({
                   </label>
                   <p className="text-xs text-muted-foreground">
                     Creates INVITE, PICKED_UP, and DID_NOT_PICKUP text message templates for this role. Requires an organization to be selected.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 rounded-md border p-3">
+                <Checkbox
+                  id="wizard-create-context-prompt"
+                  checked={createContextPrompt}
+                  onCheckedChange={(checked) => setCreateContextPrompt(checked === true)}
+                  disabled={!selectedOrganizationId || selectedOrganizationId === "__none__"}
+                  className="mt-0.5"
+                />
+                <div className="flex flex-col gap-1">
+                  <label
+                    htmlFor="wizard-create-context-prompt"
+                    className={`flex items-center gap-2 text-sm font-medium leading-none ${
+                      !selectedOrganizationId || selectedOrganizationId === "__none__"
+                        ? "text-muted-foreground"
+                        : "text-foreground cursor-pointer"
+                    }`}
+                  >
+                    <FileText className="size-4" />
+                    Create context prompt
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    Creates a default resume analyzer context prompt linked to the outbound call task. Requires an organization to be selected.
                   </p>
                 </div>
               </div>
@@ -477,6 +510,9 @@ export default function PromptWizard({
                   <li>{categories.length} scoring prompt tab{categories.length !== 1 ? "s" : ""} with AI-generated score level descriptions</li>
                   {createTexts && (
                     <li>3 text message templates (INVITE, PICKED_UP, DID_NOT_PICKUP) for candidate outreach</li>
+                  )}
+                  {createContextPrompt && (
+                    <li>A default resume analyzer context prompt linked to the outbound call task</li>
                   )}
                 </ul>
               </div>

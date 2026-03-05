@@ -6,6 +6,7 @@ import { generateAttributeKeys } from "./scoring-prompt-generation-handlers"
 import { createJobRole } from "./job-roles-handlers"
 import { createCriteriaNode } from "./create-criteria-node-handlers"
 import { createTextMessages } from "./create-text-messages-handlers"
+import { createCandidateContextPrompt } from "./candidate-context-prompt-handlers"
 
 interface SpreadsheetRow {
   category: string
@@ -28,6 +29,7 @@ interface WizardConfig {
   selectedOrganizationId: string | null
   categories: CategoryGroup[]
   createTexts: boolean
+  createContextPrompt: boolean
 }
 
 interface WizardGeneratedContent {
@@ -65,6 +67,7 @@ interface WizardPersistenceResult {
   promptId: string
   positionId: string
   textMessageIds: number[] | null
+  contextPromptId: string | null
 }
 
 interface WizardResult {
@@ -512,12 +515,22 @@ async function persistWizardArtifacts(
     textMessageIds = textResult.textMessageIds
   }
 
+  let contextPromptId: string | null = null
+  if (config.createContextPrompt && createdRole.phoneCallTaskId) {
+    onProgress?.("Creating candidate context prompt...")
+    const contextResult = await createCandidateContextPrompt({
+      taskId: createdRole.phoneCallTaskId,
+    })
+    contextPromptId = contextResult.promptId
+  }
+
   return {
     organizationId,
     roleId,
     promptId,
     positionId: positionId ?? "",
     textMessageIds,
+    contextPromptId,
   }
 }
 

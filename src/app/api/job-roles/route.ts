@@ -19,6 +19,7 @@ interface CreateJobRoleResponse {
   assessmentInstanceId: string
   jobPositionId: string
   promptId: string
+  phoneCallTaskId: string
   roleDescription: string
   assessmentInstanceName: string
   assessmentInstanceType: "JOB"
@@ -111,10 +112,29 @@ export async function GET(request: Request) {
   try {
     const result = await executeSqlQuery(
       `
-        SELECT RoleID, RoleLink, RoleDescription, PositionIDs, OrgID, Status, RoleFile, RoleImage, RoleCode, isDemo, IsHidden
-        FROM prodtake2ai.JobRoles
-        WHERE OrgID = ?
-        ORDER BY RoleDescription ASC
+        SELECT
+          jr.RoleID,
+          jr.RoleLink,
+          jr.RoleDescription,
+          jr.PositionIDs,
+          jr.OrgID,
+          jr.Status,
+          jr.RoleFile,
+          jr.RoleImage,
+          jr.RoleCode,
+          jr.isDemo,
+          jr.IsHidden,
+          t.promptToGenerateContextForCandidateId AS ContextPromptId
+        FROM prodtake2ai.JobRoles jr
+        LEFT JOIN prodtake2ai.JobPositions jp ON jp.RoleID = jr.RoleID
+        LEFT JOIN prodtake2ai.AssessmentInstances ai ON ai.AssessmentInstanceID = jp.AssessmentInstanceID
+        LEFT JOIN prodtake2ai.Assessments a ON a.AssessmentID = ai.AssessmentID
+        LEFT JOIN prodtake2ai.Tasks t
+          ON FIND_IN_SET(t.TaskID, a.Tasks) > 0
+          AND t.TaskModality = 'Phone Call'
+          AND t.TaskSubModality = 'OutboundPhoneCall'
+        WHERE jr.OrgID = ?
+        ORDER BY jr.RoleDescription ASC
       `,
       [orgId],
     )
@@ -317,6 +337,7 @@ export async function POST(request: Request) {
       assessmentInstanceId: String(assessmentInstanceId),
       jobPositionId: String(jobPositionId),
       promptId: String(promptId),
+      phoneCallTaskId: String(phoneCallTaskId),
       roleDescription,
       assessmentInstanceName,
       assessmentInstanceType: "JOB",

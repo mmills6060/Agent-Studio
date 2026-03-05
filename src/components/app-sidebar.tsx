@@ -468,6 +468,25 @@ export default function AppSidebar({
                             </Tooltip>
                             {selectedJobRoleId === jobRole.roleId && (
                               <SidebarMenuSub>
+                                {jobRole.contextPromptId && (
+                                  <SidebarMenuSubItem>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <SidebarMenuSubButton asChild>
+                                          <button
+                                            type="button"
+                                            onClick={() => onSwitchTab("context-prompt")}
+                                            className="w-full text-left"
+                                          >
+                                            <FileText />
+                                            <span>Context Prompt</span>
+                                          </button>
+                                        </SidebarMenuSubButton>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="right">Context Prompt ID: {jobRole.contextPromptId}</TooltipContent>
+                                    </Tooltip>
+                                  </SidebarMenuSubItem>
+                                )}
                                 {isLoadingPromptReferences ? (
                                   <SidebarMenuSubItem>
                                     <SidebarMenuSubButton asChild>

@@ -8,6 +8,7 @@ interface AppSidebarOrganization {
 interface AppSidebarJobRole {
   roleId: string
   roleDescription: string
+  contextPromptId: string | null
 }
 
 interface AppSidebarPromptReference {

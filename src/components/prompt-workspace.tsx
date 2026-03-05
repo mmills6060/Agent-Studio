@@ -55,6 +55,7 @@ import { DEFAULT_RESUME_JSON } from "@/lib/default-resume"
 import { runContextPrompt } from "@/components/handlers/context-prompt-run-handlers"
 import { getCriteriaScoringPromptById } from "@/components/handlers/criteria-scoring-prompt-handlers"
 import { createJobRole, getJobRolesByOrganization } from "@/components/handlers/job-roles-handlers"
+import { getCandidateContextPrompt } from "@/components/handlers/candidate-context-prompt-handlers"
 import { getPromptReferencesByRole } from "@/components/handlers/prompt-references-handlers"
 import { getPromptStringById } from "@/components/handlers/prompt-string-handlers"
 import { updatePromptStringById } from "@/components/handlers/update-prompt-string-handlers"
@@ -499,6 +500,10 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
     setCriteriaError(null)
     setPromptImportError(null)
     setCriteriaImportError(null)
+
+    const matchedRole = jobRoles.find((r) => r.roleId === roleId)
+    const contextPromptId = matchedRole?.contextPromptId ?? null
+
     try {
       const [references, criteria] = await Promise.all([
         getPromptReferencesByRole(roleId),
@@ -516,7 +521,22 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
       setIsLoadingPromptReferences(false)
       setIsLoadingCriteria(false)
     }
-  }, [])
+
+    if (contextPromptId) {
+      try {
+        const promptText = await getCandidateContextPrompt(contextPromptId)
+        if (promptText) {
+          const imported = contextFlowCanvasRef.current?.importPrompt(promptText)
+          if (imported) {
+            const state = contextFlowCanvasRef.current?.getState()
+            if (state) setContextPromptState(state)
+          }
+        }
+      } catch {
+        // Context prompt fetch is best-effort; don't block role selection
+      }
+    }
+  }, [jobRoles])
 
   const handleCreateJobRole = useCallback(async (assessmentInstanceName: string) => {
     const orgId = selectedOrganizationId?.trim() ?? ""

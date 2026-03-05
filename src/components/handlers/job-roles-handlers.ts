@@ -17,6 +17,7 @@ interface CreateJobRoleResponse {
   assessmentInstanceId?: string
   jobPositionId?: string
   promptId?: string
+  phoneCallTaskId?: string
   roleDescription?: string
   assessmentInstanceName?: string
   assessmentInstanceType?: "JOB"
@@ -29,6 +30,7 @@ interface CreatedJobRole {
   assessmentInstanceId: string | null
   jobPositionId: string | null
   promptId: string | null
+  phoneCallTaskId: string | null
   roleDescription: string | null
   assessmentInstanceName: string | null
   assessmentInstanceType: "JOB" | null
@@ -40,9 +42,16 @@ function parseJobRole(row: Record<string, unknown>): AppSidebarJobRole | null {
   if ((typeof roleId !== "number" && typeof roleId !== "string") || typeof roleDescription !== "string")
     return null
 
+  const rawContextId = row.ContextPromptId
+  const contextPromptId =
+    typeof rawContextId === "number" || typeof rawContextId === "string"
+      ? String(rawContextId)
+      : null
+
   return {
     roleId: String(roleId),
     roleDescription,
+    contextPromptId,
   }
 }
 
@@ -96,6 +105,7 @@ export async function createJobRole(input: CreateJobRoleInput & { promptString?:
     assessmentInstanceId: typeof body.assessmentInstanceId === "string" ? body.assessmentInstanceId : null,
     jobPositionId: typeof body.jobPositionId === "string" ? body.jobPositionId : null,
     promptId: typeof body.promptId === "string" ? body.promptId : null,
+    phoneCallTaskId: typeof body.phoneCallTaskId === "string" ? body.phoneCallTaskId : null,
     roleDescription: typeof body.roleDescription === "string" ? body.roleDescription : null,
     assessmentInstanceName: typeof body.assessmentInstanceName === "string" ? body.assessmentInstanceName : null,
     assessmentInstanceType: body.assessmentInstanceType === "JOB" ? "JOB" : null,
