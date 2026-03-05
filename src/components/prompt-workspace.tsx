@@ -63,6 +63,7 @@ import { getCriteriaByRole } from "@/components/handlers/role-criteria-handlers"
 import { createCriteriaNode } from "@/components/handlers/create-criteria-node-handlers"
 import { loadAllRoleScoringPrompts } from "@/components/handlers/load-all-role-scoring-prompts-handlers"
 import type { AppSidebarCriteria, AppSidebarJobRole, AppSidebarOrganization, AppSidebarPromptReference } from "@/components/handlers/app-sidebar-handlers"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 const DEFAULT_RESUME_JSON_STRING = JSON.stringify(DEFAULT_RESUME_JSON, null, 2)
 
@@ -738,6 +739,7 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
             }
           />
           <div className="ml-auto flex items-center gap-2">
+            <ThemeToggle />
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="outline" size="sm" className="gap-2">
