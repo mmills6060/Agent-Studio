@@ -1,3 +1,5 @@
+import fs from "fs"
+import path from "path"
 import OpenAI from "openai"
 import { NextResponse } from "next/server"
 
@@ -63,6 +65,25 @@ export async function POST(request: Request) {
     })
     .join("\n\n")
 
+  const promptExamplesDir = path.join(process.cwd(), "src/prompt-examples")
+  const exampleFiles = [
+    "Call Prompts - Care Advantage.txt",
+    "Call Prompt - ATS Demo (Medical Assistant).txt",
+    "Prompts - CSH.txt",
+  ]
+
+  const examplePrompts = exampleFiles
+    .map((file) => {
+      try {
+        const content = fs.readFileSync(path.join(promptExamplesDir, file), "utf-8")
+        return `=== Example Prompt: ${file} ===\n${content}`
+      } catch {
+        return null
+      }
+    })
+    .filter(Boolean)
+    .join("\n\n")
+
   const systemPrompt = `You are an expert interview prompt designer. Given interview metadata and a structured set of categories with questions, generate the per-category content needed for an AI phone screen interview prompt.
 
 You must respond with valid JSON matching this exact structure:
@@ -92,6 +113,14 @@ SYSTEM INSTRUCTION (per category): Write a brief (1-2 sentence) instruction tell
 FOLLOW-UP STRATEGY (per question): Write 2-5 bullet points describing how to follow up based on candidate responses. Use conditional language like "If yes:", "If vague:", etc. Be specific to the question content.
 
 SCORE LEVELS (per question): Generate score level descriptions from the max points down to 0. Each level should clearly describe what constitutes that score, informed by the scoring guidance provided. The number of levels should be max_points + 1 (e.g., a 3-point question has levels 3, 2, 1, 0).
+
+Below are complete real-world AI phone screen prompts. Study the [FOLLOW-UP STRATEGY] and [SYSTEM INSTRUCTION] sections throughout these examples — they are your primary reference for tone, style, depth, and structure when generating those fields.
+
+---
+
+${examplePrompts}
+
+---
 
 Respond with ONLY the JSON object. No markdown, no explanation.`
 

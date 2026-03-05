@@ -1,3 +1,5 @@
+import fs from "fs"
+import path from "path"
 import OpenAI from "openai"
 import { NextResponse } from "next/server"
 
@@ -34,6 +36,25 @@ export async function POST(request: Request) {
       { status: 400 },
     )
 
+  const promptExamplesDir = path.join(process.cwd(), "src/prompt-examples")
+  const exampleFiles = [
+    "Call Prompts - Care Advantage.txt",
+    "Call Prompt - ATS Demo (Medical Assistant).txt",
+    "Prompts - CSH.txt",
+  ]
+
+  const examplePrompts = exampleFiles
+    .map((file) => {
+      try {
+        const content = fs.readFileSync(path.join(promptExamplesDir, file), "utf-8")
+        return `=== Example Prompt: ${file} ===\n${content}`
+      } catch {
+        return null
+      }
+    })
+    .filter(Boolean)
+    .join("\n\n")
+
   const systemPrompt = `You are an expert at designing follow-up strategies for AI-driven phone screen interviews. Given an interview question, you generate a concise follow-up strategy that tells the AI interviewer how to handle different candidate responses.
 
 Your follow-up strategies should:
@@ -44,24 +65,13 @@ Your follow-up strategies should:
 - Focus on extracting the specific information the question is trying to gather
 - Not be overly long — typically 2-5 bullet points
 
-Here are examples of good follow-up strategies:
+Below are complete real-world AI phone screen prompts. Study the [FOLLOW-UP STRATEGY] sections throughout these examples — they are your primary reference for tone, style, depth, and structure when generating a new follow-up strategy.
 
-Example 1 (for "Do you have a valid driver's license with a clean driving record?"):
-- Confirm yes/no.
-- If yes but they mention restrictions/issues: ask what the restriction is (only if they volunteer it) and note it.
+---
 
-Example 2 (for "What is your highest level of education?"):
-- If they list multiple items, confirm the highest completed level.
-- If yes to a bachelor's degree or master's degree, confirm whether degree is in a core science or lab science. And if so, what discipline?
-- If in progress, confirm expected completion timing.
+${examplePrompts}
 
-Example 3 (for "Do you hold an EMTB, AEMT, or CCMA certification?"):
-- Clarify which certification(s) they hold.
-- Confirm whether it's active/current (or pending) if not stated.
-
-Example 4 (for "Describe a time when you went above and beyond for a patient."):
-- If needed, prompt for specifics: What was the situation, what did they do, and what was the outcome?
-- If they say they can't think of one: ask for a similar example of advocating for a patient or providing extra support.
+---
 
 Respond with ONLY the follow-up strategy text. No headers, no labels, no extra explanation.`
 
