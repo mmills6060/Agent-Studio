@@ -60,6 +60,7 @@ import { getPromptStringById } from "@/components/handlers/prompt-string-handler
 import { updatePromptStringById } from "@/components/handlers/update-prompt-string-handlers"
 import { getCriteriaByRole } from "@/components/handlers/role-criteria-handlers"
 import { createCriteriaNode } from "@/components/handlers/create-criteria-node-handlers"
+import { loadAllRoleScoringPrompts } from "@/components/handlers/load-all-role-scoring-prompts-handlers"
 import type { AppSidebarCriteria, AppSidebarJobRole, AppSidebarOrganization, AppSidebarPromptReference } from "@/components/handlers/app-sidebar-handlers"
 
 const DEFAULT_RESUME_JSON_STRING = JSON.stringify(DEFAULT_RESUME_JSON, null, 2)
@@ -106,6 +107,7 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
   const [contextRunError, setContextRunError] = useState<string | null>(null)
   const [isContextRunning, setIsContextRunning] = useState(false)
   const [isLoadingPromptIntoCanvas, setIsLoadingPromptIntoCanvas] = useState(false)
+  const [isLoadingAllRolePrompts, setIsLoadingAllRolePrompts] = useState(false)
   const contextRunAbortRef = useRef<AbortController | null>(null)
   const canvasRef = useRef<ScoringFlowCanvasRef>(null)
   const flowCanvasRef = useRef<FlowCanvasRef>(null)
@@ -217,6 +219,20 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
     saveCurrentCanvasState()
     setIsScoringResultsOpen(true)
   }, [saveCurrentCanvasState])
+
+  const handleLoadAllRoleScoringPrompts = useCallback(async () => {
+    if (isLoadingAllRolePrompts) return
+    setIsLoadingAllRolePrompts(true)
+    try {
+      const { tabs } = await loadAllRoleScoringPrompts(criteriaByPromptId)
+      if (tabs.length === 0) return
+      setScoringTabs(tabs)
+      setCurrentScoringTabId(tabs[0].id)
+      setActiveTab(tabs[0].id)
+    } finally {
+      setIsLoadingAllRolePrompts(false)
+    }
+  }, [isLoadingAllRolePrompts, criteriaByPromptId])
 
   const [isSaved, setIsSaved] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -798,6 +814,17 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
           scoringTabs={scoringTabs}
           activeTabId={activeTab}
           conversationMessages={conversationMessages}
+          selectedJobRoleName={
+            selectedJobRoleId
+              ? (jobRoles.find((r) => r.roleId === selectedJobRoleId)?.roleDescription ?? null)
+              : null
+          }
+          onLoadAllForRole={
+            selectedJobRoleId && Object.keys(criteriaByPromptId).length > 0
+              ? handleLoadAllRoleScoringPrompts
+              : undefined
+          }
+          isLoadingAllForRole={isLoadingAllRolePrompts}
         />
 
         <PromptWizard

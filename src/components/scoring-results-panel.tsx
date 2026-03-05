@@ -10,6 +10,7 @@ import {
   Loader2,
   AlertCircle,
   ClipboardCheck,
+  RefreshCw,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -36,6 +37,9 @@ interface ScoringResultsPanelProps {
   scoringTabs: ScoringTab[]
   activeTabId: string
   conversationMessages: ConversationMessage[]
+  selectedJobRoleName?: string | null
+  onLoadAllForRole?: () => Promise<void>
+  isLoadingAllForRole?: boolean
 }
 
 export default function ScoringResultsPanel({
@@ -44,6 +48,9 @@ export default function ScoringResultsPanel({
   scoringTabs,
   activeTabId,
   conversationMessages,
+  selectedJobRoleName,
+  onLoadAllForRole,
+  isLoadingAllForRole,
 }: ScoringResultsPanelProps) {
   const [transcript, setTranscript] = useState("")
   const [isTranscriptOpen, setIsTranscriptOpen] = useState(false)
@@ -148,6 +155,28 @@ export default function ScoringResultsPanel({
               placeholder="Paste a conversation transcript here, or run a conversation first to auto-fill..."
               className="min-h-[160px] max-h-[40vh] overflow-y-auto font-mono text-sm resize-none"
             />
+          )}
+
+          {selectedJobRoleName && onLoadAllForRole && (
+            <div className="flex items-center gap-2 rounded-md border border-dashed bg-muted/40 px-3 py-2">
+              <span className="flex-1 text-xs text-muted-foreground">
+                Load all scoring prompts for <span className="font-medium text-foreground">{selectedJobRoleName}</span>
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onLoadAllForRole}
+                disabled={isLoadingAllForRole || isRunning}
+                className="gap-2 shrink-0"
+              >
+                {isLoadingAllForRole ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="size-4" />
+                )}
+                {isLoadingAllForRole ? "Loading…" : "Load All"}
+              </Button>
+            </div>
           )}
 
           <div className="flex items-center gap-2">
