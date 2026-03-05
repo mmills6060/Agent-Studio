@@ -46,6 +46,12 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import type { AppSidebarProps } from "@/components/handlers/app-sidebar-handlers"
 import type { ScoringPromptTab } from "@/components/handlers/scoring-prompt-manager-handlers"
 
@@ -107,21 +113,27 @@ function SortableScoringTab({
           autoFocus
         />
       ) : (
-        <SidebarMenuSubButton
-          isActive={tab.id === activeTab}
-          onClick={() => onSwitchTab(tab.id)}
-          onDoubleClick={() => onStartRename(tab.id)}
-          className="relative pr-10"
-        >
-          <span
-            {...attributes}
-            {...listeners}
-            className="flex shrink-0 cursor-grab items-center text-sidebar-foreground/50 active:cursor-grabbing"
-          >
-            <GripVertical className="size-3" />
-          </span>
-          <span className="truncate">{tab.name}</span>
-        </SidebarMenuSubButton>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <SidebarMenuSubButton
+              isActive={tab.id === activeTab}
+              onClick={() => onSwitchTab(tab.id)}
+              onDoubleClick={() => onStartRename(tab.id)}
+              className="relative pr-10"
+            >
+              <span
+                {...attributes}
+                {...listeners}
+                suppressHydrationWarning
+                className="flex shrink-0 cursor-grab items-center text-sidebar-foreground/50 active:cursor-grabbing"
+              >
+                <GripVertical className="size-3" />
+              </span>
+              <span className="truncate">{tab.name}</span>
+            </SidebarMenuSubButton>
+          </TooltipTrigger>
+          <TooltipContent side="right">{tab.name}</TooltipContent>
+        </Tooltip>
       )}
       {editingTabId !== tab.id && (
         <div className="absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-0.5 opacity-0 transition-opacity group-hover/scoring-item:opacity-100">
@@ -274,39 +286,55 @@ export default function AppSidebar({
   }
 
   return (
+    <TooltipProvider>
     <Sidebar>
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton
-                isActive={activeTab === "call-prompt"}
-                onClick={() => onSwitchTab("call-prompt")}
-              >
-                <Phone />
-                <span>Call Prompt</span>
-              </SidebarMenuButton>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <SidebarMenuButton
+                    isActive={activeTab === "call-prompt"}
+                    onClick={() => onSwitchTab("call-prompt")}
+                  >
+                    <Phone />
+                    <span>Call Prompt</span>
+                  </SidebarMenuButton>
+                </TooltipTrigger>
+                <TooltipContent side="right">Configure the main call conversation script</TooltipContent>
+              </Tooltip>
             </SidebarMenuItem>
 
             <SidebarMenuItem>
-              <SidebarMenuButton
-                isActive={activeTab === "context-prompt"}
-                onClick={() => onSwitchTab("context-prompt")}
-              >
-                <FileText />
-                <span>Context Prompt</span>
-              </SidebarMenuButton>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <SidebarMenuButton
+                    isActive={activeTab === "context-prompt"}
+                    onClick={() => onSwitchTab("context-prompt")}
+                  >
+                    <FileText />
+                    <span>Context Prompt</span>
+                  </SidebarMenuButton>
+                </TooltipTrigger>
+                <TooltipContent side="right">Provide background context for the AI agent</TooltipContent>
+              </Tooltip>
             </SidebarMenuItem>
 
             <Collapsible defaultOpen className="group/collapsible">
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
-                  <SidebarMenuButton>
-                    <ClipboardCheck />
-                    <span>Scoring Prompts</span>
-                    <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                  </SidebarMenuButton>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <SidebarMenuButton>
+                        <ClipboardCheck />
+                        <span>Scoring Prompts</span>
+                        <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                      </SidebarMenuButton>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">Manage evaluation criteria for scored calls</TooltipContent>
+                  </Tooltip>
                 </CollapsibleTrigger>
 
                 <SidebarMenuAction onClick={onAddScoringTab} title="Add scoring prompt">
@@ -363,13 +391,18 @@ export default function AppSidebar({
             ) : (
               organizations.map((organization) => (
                 <SidebarMenuItem key={organization.orgId}>
-                  <SidebarMenuButton
-                    isActive={selectedOrganizationId === organization.orgId}
-                    onClick={() => onSelectOrganization(organization.orgId)}
-                  >
-                    <Building2 />
-                    <span>{organization.orgName}</span>
-                  </SidebarMenuButton>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <SidebarMenuButton
+                        isActive={selectedOrganizationId === organization.orgId}
+                        onClick={() => onSelectOrganization(organization.orgId)}
+                      >
+                        <Building2 />
+                        <span>{organization.orgName}</span>
+                      </SidebarMenuButton>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">{organization.orgName}</TooltipContent>
+                  </Tooltip>
                   {selectedOrganizationId === organization.orgId && (
                     <SidebarMenuSub>
                       <SidebarMenuSubItem>
@@ -384,7 +417,7 @@ export default function AppSidebar({
                             className="w-full text-left"
                           >
                             <Plus />
-                            <span>Create role</span>
+                            <span>Create assessment</span>
                           </button>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>
@@ -393,7 +426,7 @@ export default function AppSidebar({
                           <SidebarMenuSubButton asChild>
                             <button type="button" disabled>
                               <BriefcaseBusiness />
-                              <span>Loading roles...</span>
+                              <span>Loading assessments...</span>
                             </button>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
@@ -411,23 +444,28 @@ export default function AppSidebar({
                           <SidebarMenuSubButton asChild>
                             <button type="button" disabled>
                               <BriefcaseBusiness />
-                              <span>No roles found</span>
+                              <span>No assessments found</span>
                             </button>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                       ) : (
                         jobRoles.map((jobRole) => (
                           <SidebarMenuSubItem key={jobRole.roleId}>
-                            <SidebarMenuSubButton asChild>
-                              <button
-                                type="button"
-                                onClick={() => onSelectJobRole(jobRole.roleId)}
-                                className="w-full text-left"
-                              >
-                                <BriefcaseBusiness />
-                                <span>{jobRole.roleDescription}</span>
-                              </button>
-                            </SidebarMenuSubButton>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <SidebarMenuSubButton asChild>
+                                  <button
+                                    type="button"
+                                    onClick={() => onSelectJobRole(jobRole.roleId)}
+                                    className="w-full text-left"
+                                  >
+                                    <BriefcaseBusiness />
+                                    <span>{jobRole.assessmentInstanceName ?? jobRole.roleDescription}</span>
+                                  </button>
+                                </SidebarMenuSubButton>
+                              </TooltipTrigger>
+                              <TooltipContent side="right">{jobRole.assessmentInstanceName ?? jobRole.roleDescription}</TooltipContent>
+                            </Tooltip>
                             {selectedJobRoleId === jobRole.roleId && (
                               <SidebarMenuSub>
                                 {isLoadingPromptReferences ? (
@@ -460,16 +498,21 @@ export default function AppSidebar({
                                   <>
                                     {promptReferences.flatMap((reference) => [
                                       <SidebarMenuSubItem key={reference.promptId}>
-                                        <SidebarMenuSubButton asChild>
-                                          <button
-                                            type="button"
-                                            onClick={() => onSelectPromptReference(reference.promptId)}
-                                            className="w-full text-left"
-                                          >
-                                            <Phone />
-                                            <span>Call Prompt</span>
-                                          </button>
-                                        </SidebarMenuSubButton>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <SidebarMenuSubButton asChild>
+                                              <button
+                                                type="button"
+                                                onClick={() => onSelectPromptReference(reference.promptId)}
+                                                className="w-full text-left"
+                                              >
+                                                <Phone />
+                                                <span>Call Prompt</span>
+                                              </button>
+                                            </SidebarMenuSubButton>
+                                          </TooltipTrigger>
+                                          <TooltipContent side="right">Prompt ID: {reference.promptId}</TooltipContent>
+                                        </Tooltip>
                                       </SidebarMenuSubItem>,
                                       ...(isLoadingCriteria
                                         ? []
@@ -477,16 +520,21 @@ export default function AppSidebar({
                                           ? []
                                           : (criteriaByPromptId[reference.promptId] ?? []).map((criteria) => (
                                               <SidebarMenuSubItem key={`${reference.promptId}-${criteria.criteriaId}`}>
-                                                <SidebarMenuSubButton asChild>
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => onSelectCriteria(criteria.criteriaId, reference.promptId)}
-                                                    className="w-full text-left"
-                                                  >
-                                                    <ListChecks />
-                                                    <span>{criteria.criteriaName}</span>
-                                                  </button>
-                                                </SidebarMenuSubButton>
+                                                <Tooltip>
+                                                  <TooltipTrigger asChild>
+                                                    <SidebarMenuSubButton asChild>
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => onSelectCriteria(criteria.criteriaId, reference.promptId)}
+                                                        className="w-full text-left"
+                                                      >
+                                                        <ListChecks />
+                                                        <span>{criteria.criteriaName}</span>
+                                                      </button>
+                                                    </SidebarMenuSubButton>
+                                                  </TooltipTrigger>
+                                                  <TooltipContent side="right">{criteria.criteriaName}</TooltipContent>
+                                                </Tooltip>
                                               </SidebarMenuSubItem>
                                             ))),
                                       <SidebarMenuSubItem key={`create-criteria-${reference.promptId}`}>
@@ -682,5 +730,6 @@ export default function AppSidebar({
         </DialogContent>
       </Dialog>
     </Sidebar>
+    </TooltipProvider>
   )
 }

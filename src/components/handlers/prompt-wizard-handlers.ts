@@ -5,6 +5,7 @@ import { createScoringBlock, generateScoringPrompt, type ScoringNodeData } from 
 import { generateAttributeKeys } from "./scoring-prompt-generation-handlers"
 import { createJobRole } from "./job-roles-handlers"
 import { createCriteriaNode } from "./create-criteria-node-handlers"
+import { createTextMessages } from "./create-text-messages-handlers"
 
 interface SpreadsheetRow {
   category: string
@@ -26,6 +27,7 @@ interface WizardConfig {
   aboutRole: string
   selectedOrganizationId: string | null
   categories: CategoryGroup[]
+  createTexts: boolean
 }
 
 interface WizardGeneratedContent {
@@ -61,6 +63,8 @@ interface WizardPersistenceResult {
   organizationId: string
   roleId: string
   promptId: string
+  positionId: string
+  textMessageIds: number[] | null
 }
 
 interface WizardResult {
@@ -476,6 +480,7 @@ async function persistWizardArtifacts(
 
   const roleId = createdRole.roleId
   const promptId = createdRole.promptId
+  const positionId = createdRole.jobPositionId
   if (!promptId)
     throw new Error("Created role is missing promptId")
 
@@ -494,10 +499,25 @@ async function persistWizardArtifacts(
     })
   }
 
+  let textMessageIds: number[] | null = null
+  if (config.createTexts) {
+    onProgress?.("Creating text message templates...")
+    const textResult = await createTextMessages({
+      orgId: organizationId,
+      roleId,
+      positionId: positionId ?? "",
+      companyName: config.companyName,
+      interviewerName: config.interviewerName,
+    })
+    textMessageIds = textResult.textMessageIds
+  }
+
   return {
     organizationId,
     roleId,
     promptId,
+    positionId: positionId ?? "",
+    textMessageIds,
   }
 }
 

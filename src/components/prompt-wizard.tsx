@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useRef, useState } from "react"
-import { Upload, ArrowLeft, ArrowRight, Sparkles, FileSpreadsheet, AlertCircle } from "lucide-react"
+import { Upload, ArrowLeft, ArrowRight, Sparkles, FileSpreadsheet, AlertCircle, MessageSquare } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   parseCSV,
   groupByCategory,
@@ -56,6 +57,7 @@ export default function PromptWizard({
   const [aboutCompany, setAboutCompany] = useState("")
   const [aboutRole, setAboutRole] = useState("")
   const [selectedOrganizationId, setSelectedOrganizationId] = useState(defaultOrganizationId ?? "")
+  const [createTexts, setCreateTexts] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [progressMessage, setProgressMessage] = useState("")
   const [generateError, setGenerateError] = useState("")
@@ -75,6 +77,7 @@ export default function PromptWizard({
     setAboutCompany("")
     setAboutRole("")
     setSelectedOrganizationId(defaultOrganizationId ?? "")
+    setCreateTexts(false)
     setIsGenerating(false)
     setProgressMessage("")
     setGenerateError("")
@@ -161,6 +164,7 @@ export default function PromptWizard({
           aboutRole: aboutRole.trim(),
           selectedOrganizationId: selectedOrganizationId.trim() || null,
           categories,
+          createTexts,
         },
         setProgressMessage,
       )
@@ -184,6 +188,7 @@ export default function PromptWizard({
     aboutRole,
     selectedOrganizationId,
     categories,
+    createTexts,
     onComplete,
     handleOpenChange,
   ])
@@ -327,7 +332,11 @@ export default function PromptWizard({
                 </label>
                 <Select
                   value={selectedOrganizationId || "__none__"}
-                  onValueChange={(value) => setSelectedOrganizationId(value === "__none__" ? "" : value)}
+                  onValueChange={(value) => {
+                    const newOrgId = value === "__none__" ? "" : value
+                    setSelectedOrganizationId(newOrgId)
+                    if (!newOrgId) setCreateTexts(false)
+                  }}
                 >
                   <SelectTrigger id="wizard-organization">
                     <SelectValue placeholder="Do not save under an organization" />
@@ -344,6 +353,32 @@ export default function PromptWizard({
                 <p className="text-xs text-muted-foreground">
                   If selected, the wizard will also create a role, call prompt, and scoring criteria under this organization.
                 </p>
+              </div>
+
+              <div className="flex items-start gap-3 rounded-md border p-3">
+                <Checkbox
+                  id="wizard-create-texts"
+                  checked={createTexts}
+                  onCheckedChange={(checked) => setCreateTexts(checked === true)}
+                  disabled={!selectedOrganizationId || selectedOrganizationId === "__none__"}
+                  className="mt-0.5"
+                />
+                <div className="flex flex-col gap-1">
+                  <label
+                    htmlFor="wizard-create-texts"
+                    className={`flex items-center gap-2 text-sm font-medium leading-none ${
+                      !selectedOrganizationId || selectedOrganizationId === "__none__"
+                        ? "text-muted-foreground"
+                        : "text-foreground cursor-pointer"
+                    }`}
+                  >
+                    <MessageSquare className="size-4" />
+                    Create texts
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    Creates INVITE, PICKED_UP, and DID_NOT_PICKUP text message templates for this role. Requires an organization to be selected.
+                  </p>
+                </div>
               </div>
 
               <div className="flex flex-col gap-2">
@@ -440,6 +475,9 @@ export default function PromptWizard({
                   <li>Rules, Instructions, FAQ, and Global Constraint blocks with standard content</li>
                   <li>{categories.length} section{categories.length !== 1 ? "s" : ""} with {totalQuestions} interview question{totalQuestions !== 1 ? "s" : ""} and AI-generated follow-up strategies</li>
                   <li>{categories.length} scoring prompt tab{categories.length !== 1 ? "s" : ""} with AI-generated score level descriptions</li>
+                  {createTexts && (
+                    <li>3 text message templates (INVITE, PICKED_UP, DID_NOT_PICKUP) for candidate outreach</li>
+                  )}
                 </ul>
               </div>
 
