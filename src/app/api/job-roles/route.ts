@@ -308,10 +308,10 @@ export async function POST(request: Request) {
         INSERT INTO prodtake2ai.OrgLanguageProcessingParams
           (OrgID, TaskID, TranscriptionService, TranscriptionServiceModel, TranscriptionSourceLanguage,
            TranslationTargetLanguage, isPunctuationRequired, AreFillerWordsTranscribed, Keywords,
-           TranslationService, TranslationSourceLanguage)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           TranslationService, TranslationSourceLanguage, isSpeakerRecognitionRequired)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
-      [orgId, phoneCallTaskId, "Deepgram", "enhanced", "en-US", "", 1, 1, keywords ? JSON.stringify(keywords.split(",").map((k) => k.trim()).filter(Boolean)) : "[]", '["Inglis"]', ""],
+      [orgId, phoneCallTaskId, "Deepgram", "enhanced", "en-US", null, 1, 0, keywords ? JSON.stringify(keywords.split(",").map((k) => k.trim()).filter(Boolean)) : "[]", null, null, 1],
     )
 
     await executeSqlMutation(
