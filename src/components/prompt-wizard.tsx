@@ -59,6 +59,7 @@ export default function PromptWizard({
   const [selectedOrganizationId, setSelectedOrganizationId] = useState(defaultOrganizationId ?? "")
   const [createTexts, setCreateTexts] = useState(false)
   const [createContextPrompt, setCreateContextPrompt] = useState(false)
+  const [keywords, setKeywords] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [progressMessage, setProgressMessage] = useState("")
   const [generateError, setGenerateError] = useState("")
@@ -80,6 +81,7 @@ export default function PromptWizard({
     setSelectedOrganizationId(defaultOrganizationId ?? "")
     setCreateTexts(false)
     setCreateContextPrompt(false)
+    setKeywords("")
     setIsGenerating(false)
     setProgressMessage("")
     setGenerateError("")
@@ -168,6 +170,7 @@ export default function PromptWizard({
           categories,
           createTexts,
           createContextPrompt,
+          keywords: keywords.trim(),
         },
         setProgressMessage,
       )
@@ -193,6 +196,7 @@ export default function PromptWizard({
     categories,
     createTexts,
     createContextPrompt,
+    keywords,
     onComplete,
     handleOpenChange,
   ])
@@ -415,6 +419,22 @@ export default function PromptWizard({
               </div>
 
               <div className="flex flex-col gap-2">
+                <label htmlFor="wizard-keywords" className="text-sm font-medium text-foreground">
+                  STT Keywords
+                </label>
+                <Input
+                  id="wizard-keywords"
+                  value={keywords}
+                  onChange={(e) => setKeywords(e.target.value)}
+                  placeholder="e.g., Acme Corp, NP, telehealth"
+                  disabled={!selectedOrganizationId || selectedOrganizationId === "__none__"}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Comma-separated keywords to boost speech-to-text accuracy. Only used when saving under an organization.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2">
                 <label htmlFor="wizard-company" className="text-sm font-medium text-foreground">
                   Company Name
                 </label>
@@ -494,6 +514,12 @@ export default function PromptWizard({
                   <span className="text-foreground font-medium line-clamp-2">{aboutCompany}</span>
                   <span className="text-muted-foreground">About Role</span>
                   <span className="text-foreground font-medium line-clamp-2">{aboutRole}</span>
+                  {selectedOrganizationId && keywords && (
+                    <>
+                      <span className="text-muted-foreground">STT Keywords</span>
+                      <span className="text-foreground font-medium line-clamp-2">{keywords}</span>
+                    </>
+                  )}
                   <span className="text-muted-foreground">Categories</span>
                   <span className="text-foreground font-medium">{categories.length}</span>
                   <span className="text-muted-foreground">Total Questions</span>

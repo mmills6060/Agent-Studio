@@ -30,6 +30,7 @@ interface WizardConfig {
   categories: CategoryGroup[]
   createTexts: boolean
   createContextPrompt: boolean
+  keywords: string
 }
 
 interface WizardGeneratedContent {
@@ -479,6 +480,7 @@ async function persistWizardArtifacts(
     roleDescription: config.roleTitle.trim(),
     assessmentInstanceName: config.roleTitle.trim(),
     promptString: callPromptString,
+    keywords: config.keywords.trim(),
   })
 
   const roleId = createdRole.roleId

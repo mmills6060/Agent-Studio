@@ -9,6 +9,7 @@ interface CreateJobRoleInput {
   orgId: string
   roleDescription: string
   assessmentInstanceName: string
+  keywords?: string
 }
 
 interface CreateJobRoleResponse {

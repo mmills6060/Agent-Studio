@@ -11,6 +11,7 @@ interface CreateJobRoleRequest {
   roleDescription?: unknown
   assessmentInstanceName?: unknown
   promptString?: unknown
+  keywords?: unknown
 }
 
 interface CreateJobRoleResponse {
@@ -171,6 +172,7 @@ export async function POST(request: Request) {
   const roleDescription = parseStringValue(body.roleDescription)
   const assessmentInstanceName = parseStringValue(body.assessmentInstanceName)
   const promptString = parseRawStringValue(body.promptString)
+  const keywords = parseStringValue(body.keywords)
 
   if (!orgId)
     return NextResponse.json(
@@ -300,6 +302,17 @@ export async function POST(request: Request) {
     const phoneCallTaskId = phoneCallTaskResult.insertId
     if (!phoneCallTaskId)
       throw new SqlQueryValidationError("Failed to create phone call task", 502)
+
+    await executeSqlMutation(
+      `
+        INSERT INTO prodtake2ai.OrgLanguageProcessingParams
+          (OrgID, TaskID, TranscriptionService, TranscriptionServiceModel, TranscriptionSourceLanguage,
+           TranslationTargetLanguage, isPunctuationRequired, AreFillerWordsTranscribed, Keywords,
+           TranslationService, TranslationSourceLanguage)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [orgId, phoneCallTaskId, "Deepgram", "enhanced", "en-US", "", 1, 1, keywords ? JSON.stringify(keywords.split(",").map((k) => k.trim()).filter(Boolean)) : "[]", '["Inglis"]', ""],
+    )
 
     await executeSqlMutation(
       `
