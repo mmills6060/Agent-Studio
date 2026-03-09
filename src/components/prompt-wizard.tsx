@@ -38,7 +38,7 @@ interface PromptWizardProps {
   defaultOrganizationId: string | null
 }
 
-const STEPS = ["Upload CSV", "Interview Details", "Review & Generate"] as const
+const STEPS = ["Upload CSV", "Interview Details", "Company & Role", "Review & Generate"] as const
 
 export default function PromptWizard({
   isOpen,
@@ -142,8 +142,10 @@ export default function PromptWizard({
     currentStep === 0
       ? categories.length > 0 && !parseError
       : currentStep === 1
-        ? interviewerName.trim() && companyName.trim() && roleTitle.trim() && aboutCompany.trim() && aboutRole.trim()
-        : false
+        ? !!interviewerName.trim()
+        : currentStep === 2
+          ? !!companyName.trim() && !!roleTitle.trim() && !!aboutCompany.trim() && !!aboutRole.trim()
+          : false
 
   const handleNext = useCallback(() => {
     if (currentStep < STEPS.length - 1) setCurrentStep((s) => s + 1)
@@ -434,6 +436,11 @@ export default function PromptWizard({
                 </p>
               </div>
 
+            </div>
+          )}
+
+          {currentStep === 2 && (
+            <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-2">
                 <label htmlFor="wizard-company" className="text-sm font-medium text-foreground">
                   Company Name
@@ -495,7 +502,7 @@ export default function PromptWizard({
             </div>
           )}
 
-          {currentStep === 2 && (
+          {currentStep === 3 && (
             <div className="flex flex-col gap-4">
               <div className="rounded-md border bg-muted/30 p-4">
                 <h4 className="text-sm font-medium text-foreground mb-3">Generation Summary</h4>
