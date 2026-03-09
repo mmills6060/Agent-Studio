@@ -9,6 +9,7 @@ interface AppSidebarJobRole {
   roleId: string
   roleDescription: string
   contextPromptId: string | null
+  phoneCallTaskId: string | null
 }
 
 interface AppSidebarPromptReference {
@@ -55,6 +56,8 @@ interface AppSidebarProps {
   onSelectPromptReference: (promptId: string) => void
   onSelectCriteria: (criteriaId: string, promptId: string) => void
   onCreateCriteriaNode: (promptId: string, criteriaName: string, minScore: number, maxScore: number) => Promise<void>
+  onCreateContextPrompt: (roleId: string) => Promise<void>
+  isCreatingContextPrompt: boolean
 }
 
 export type {

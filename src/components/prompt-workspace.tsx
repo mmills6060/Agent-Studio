@@ -55,7 +55,7 @@ import { DEFAULT_RESUME_JSON } from "@/lib/default-resume"
 import { runContextPrompt } from "@/components/handlers/context-prompt-run-handlers"
 import { getCriteriaScoringPromptById, updateCriteriaScoringPrompt } from "@/components/handlers/criteria-scoring-prompt-handlers"
 import { createJobRole, getJobRolesByOrganization } from "@/components/handlers/job-roles-handlers"
-import { getCandidateContextPrompt, updateCandidateContextPrompt } from "@/components/handlers/candidate-context-prompt-handlers"
+import { createCandidateContextPrompt, getCandidateContextPrompt, updateCandidateContextPrompt } from "@/components/handlers/candidate-context-prompt-handlers"
 import { getPromptReferencesByRole } from "@/components/handlers/prompt-references-handlers"
 import { getPromptStringById } from "@/components/handlers/prompt-string-handlers"
 import { updatePromptStringById } from "@/components/handlers/update-prompt-string-handlers"
@@ -79,6 +79,7 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
   const [jobRoles, setJobRoles] = useState<AppSidebarJobRole[]>([])
   const [isLoadingJobRoles, setIsLoadingJobRoles] = useState(false)
   const [isCreatingJobRole, setIsCreatingJobRole] = useState(false)
+  const [isCreatingContextPrompt, setIsCreatingContextPrompt] = useState(false)
   const [jobRolesError, setJobRolesError] = useState<string | null>(null)
   const [selectedJobRoleId, setSelectedJobRoleId] = useState<string | null>(null)
   const [promptReferences, setPromptReferences] = useState<AppSidebarPromptReference[]>([])
@@ -582,6 +583,25 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
     }
   }, [selectedOrganizationId])
 
+  const handleCreateContextPrompt = useCallback(async (roleId: string) => {
+    const role = jobRoles.find((r) => r.roleId === roleId)
+    if (!role?.phoneCallTaskId)
+      throw new Error("No outbound call task found for this role")
+
+    const orgId = selectedOrganizationId?.trim() ?? ""
+    if (!orgId)
+      throw new Error("No organization selected")
+
+    setIsCreatingContextPrompt(true)
+    try {
+      await createCandidateContextPrompt({ taskId: role.phoneCallTaskId })
+      const roles = await getJobRolesByOrganization(orgId)
+      setJobRoles(roles)
+    } finally {
+      setIsCreatingContextPrompt(false)
+    }
+  }, [jobRoles, selectedOrganizationId])
+
   const handleSelectPromptReference = useCallback(async (promptId: string) => {
     setPromptImportError(null)
     setCriteriaImportError(null)
@@ -715,6 +735,8 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
         onSelectPromptReference={handleSelectPromptReference}
         onSelectCriteria={handleSelectCriteria}
         onCreateCriteriaNode={handleCreateCriteriaNode}
+        onCreateContextPrompt={handleCreateContextPrompt}
+        isCreatingContextPrompt={isCreatingContextPrompt}
       />
       <SidebarInset>
         <header className="flex h-10 items-center gap-2 px-2">

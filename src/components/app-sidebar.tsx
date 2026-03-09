@@ -200,6 +200,8 @@ export default function AppSidebar({
   onSelectPromptReference,
   onSelectCriteria,
   onCreateCriteriaNode,
+  onCreateContextPrompt,
+  isCreatingContextPrompt,
 }: AppSidebarProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [isCreateRoleOpen, setIsCreateRoleOpen] = useState(false)
@@ -468,7 +470,7 @@ export default function AppSidebar({
                             </Tooltip>
                             {selectedJobRoleId === jobRole.roleId && (
                               <SidebarMenuSub>
-                                {jobRole.contextPromptId && (
+                                {jobRole.contextPromptId ? (
                                   <SidebarMenuSubItem>
                                     <Tooltip>
                                       <TooltipTrigger asChild>
@@ -485,6 +487,20 @@ export default function AppSidebar({
                                       </TooltipTrigger>
                                       <TooltipContent side="right">Context Prompt ID: {jobRole.contextPromptId}</TooltipContent>
                                     </Tooltip>
+                                  </SidebarMenuSubItem>
+                                ) : jobRole.phoneCallTaskId && (
+                                  <SidebarMenuSubItem>
+                                    <SidebarMenuSubButton asChild>
+                                      <button
+                                        type="button"
+                                        onClick={() => onCreateContextPrompt(jobRole.roleId)}
+                                        disabled={isCreatingContextPrompt}
+                                        className="w-full text-left"
+                                      >
+                                        <Plus />
+                                        <span>{isCreatingContextPrompt ? "Creating..." : "Create context prompt"}</span>
+                                      </button>
+                                    </SidebarMenuSubButton>
                                   </SidebarMenuSubItem>
                                 )}
                                 {isLoadingPromptReferences ? (

@@ -124,7 +124,8 @@ export async function GET(request: Request) {
           jr.RoleCode,
           jr.isDemo,
           jr.IsHidden,
-          t.promptToGenerateContextForCandidateId AS ContextPromptId
+          t.promptToGenerateContextForCandidateId AS ContextPromptId,
+          t.TaskID AS PhoneCallTaskId
         FROM prodtake2ai.JobRoles jr
         LEFT JOIN prodtake2ai.JobPositions jp ON jp.RoleID = jr.RoleID
         LEFT JOIN prodtake2ai.AssessmentInstances ai ON ai.AssessmentInstanceID = jp.AssessmentInstanceID

@@ -205,6 +205,15 @@ export async function POST(request: Request) {
     if (!promptId)
       throw new SqlQueryValidationError("Failed to create context prompt", 502)
 
+    await executeSqlMutation(
+      `
+        UPDATE prodtake2ai.Tasks
+        SET promptToGenerateContextForCandidateId = ?
+        WHERE TaskID = ?
+      `,
+      [promptId, taskId],
+    )
+
     return NextResponse.json({
       promptId: String(promptId),
       taskId: String(taskId),

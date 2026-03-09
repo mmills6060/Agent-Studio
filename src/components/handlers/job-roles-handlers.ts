@@ -48,10 +48,17 @@ function parseJobRole(row: Record<string, unknown>): AppSidebarJobRole | null {
       ? String(rawContextId)
       : null
 
+  const rawTaskId = row.PhoneCallTaskId
+  const phoneCallTaskId =
+    typeof rawTaskId === "number" || typeof rawTaskId === "string"
+      ? String(rawTaskId)
+      : null
+
   return {
     roleId: String(roleId),
     roleDescription,
     contextPromptId,
+    phoneCallTaskId,
   }
 }
 
