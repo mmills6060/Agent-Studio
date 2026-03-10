@@ -31,6 +31,7 @@ function createScoringBlock(
   nodeIdCounter += 1
   const config = getScoringBlockType(blockType)
   const label = config?.label ?? "Scoring Block"
+  const isCandidateResumeContext = blockType === "candidate-resume-context"
 
   return {
     id: `scoring-${blockType}-${nodeIdCounter}-${Date.now()}`,
@@ -40,7 +41,7 @@ function createScoringBlock(
       label,
       nodeType: blockType,
       blockType,
-      content: "",
+      content: isCandidateResumeContext ? "<CANDIDATE_RESUME_CONTEXT>" : "",
       maxPoints: 0,
       source: "",
       goal: "",
@@ -158,6 +159,10 @@ function formatScoringNode(node: Node<ScoringNodeData>): string {
       return content.trim() ? `${header}\n${content.trim()}` : ""
     }
     case "input-context": {
+      const header = `Important input: ${label}`
+      return content.trim() ? `${header}\n${content.trim()}` : ""
+    }
+    case "candidate-resume-context": {
       const header = `Important input: ${label}`
       return content.trim() ? `${header}\n${content.trim()}` : ""
     }

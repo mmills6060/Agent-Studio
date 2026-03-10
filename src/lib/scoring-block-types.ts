@@ -32,6 +32,13 @@ const SCORING_BLOCK_TYPES: Record<string, ScoringBlockTypeConfig> = {
     accentColor: "border-l-chart-2",
     hasAttributeFields: false,
   },
+  "candidate-resume-context": {
+    id: "candidate-resume-context",
+    label: "Candidate Resume Context",
+    icon: Database,
+    accentColor: "border-l-chart-2",
+    hasAttributeFields: false,
+  },
   "scoring-attribute": {
     id: "scoring-attribute",
     label: "Scoring Attribute",

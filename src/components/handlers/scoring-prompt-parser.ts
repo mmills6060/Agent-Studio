@@ -70,9 +70,14 @@ function detectSectionHeader(line: string): { blockType: string | null; label?: 
   for (const header of SECTION_HEADERS) {
     const match = trimmed.match(header.pattern)
     if (match) {
+      const inputLabel = match[1]?.trim()
+      const isCandidateResumeContext =
+        header.blockType === "input-context"
+        && inputLabel?.toLowerCase() === "candidate resume context"
+
       return {
-        blockType: header.blockType,
-        label: match[1] && header.blockType === "input-context" ? match[1].trim() : undefined,
+        blockType: isCandidateResumeContext ? "candidate-resume-context" : header.blockType,
+        label: match[1] && header.blockType === "input-context" ? inputLabel : undefined,
       }
     }
   }
@@ -222,9 +227,12 @@ function parseScoringPrompt(text: string): {
       continue
     }
 
-    if (section.blockType === "input-context") {
+    if (section.blockType === "input-context" || section.blockType === "candidate-resume-context") {
       addNode(section.blockType, {
-        label: section.label ?? "Input Context",
+        label:
+          section.blockType === "candidate-resume-context"
+            ? "Candidate Resume Context"
+            : section.label ?? "Input Context",
         content,
       })
       continue
@@ -309,8 +317,9 @@ function convertParsedJsonToNodes(parsed: ParsedScoringPromptJson): {
 
   if (parsed.input_contexts) {
     for (const ctx of parsed.input_contexts) {
-      addNode("input-context", {
-        label: ctx.label || "Input Context",
+      const isCandidateResumeContext = ctx.label?.toLowerCase() === "candidate resume context"
+      addNode(isCandidateResumeContext ? "candidate-resume-context" : "input-context", {
+        label: isCandidateResumeContext ? "Candidate Resume Context" : ctx.label || "Input Context",
         content: ctx.content,
       })
     }
