@@ -98,7 +98,7 @@ export async function PATCH(request: Request) {
     const result = await executeSqlMutation(
       `
         UPDATE prodtake2ai.TaskCriteriaIndicatorPrompts
-        SET ScoringPrompt = ?
+        SET ScoringPrompt = ?, shouldShowRationale = 1
         WHERE CriteriaID = ?
       `,
       [scoringPrompt, criteriaId],

@@ -377,8 +377,8 @@ async function linkTaskCriteriaIndicator(
     await executeSqlMutation(
       `
         INSERT INTO prodtake2ai.TaskCriteriaIndicatorPrompts
-          (TaskID, CriteriaID, IndicatorID, ScoringPrompt)
-        VALUES (?, ?, ?, ?)
+          (TaskID, CriteriaID, IndicatorID, ScoringPrompt, shouldShowRationale)
+        VALUES (?, ?, ?, ?, 1)
       `,
       [taskId, criteriaId, indicatorId, scoringPrompt],
       environment,
@@ -391,8 +391,8 @@ async function linkTaskCriteriaIndicator(
   await executeSqlMutation(
     `
       INSERT INTO prodtake2ai.TaskCriteriaIndicatorPrompts
-        (TaskID, CriteriaID, IndicatorID)
-      VALUES (?, ?, ?)
+        (TaskID, CriteriaID, IndicatorID, shouldShowRationale)
+      VALUES (?, ?, ?, 1)
     `,
     [taskId, criteriaId, indicatorId],
     environment,
