@@ -1,5 +1,6 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { Phone, FileText, ClipboardCheck, Plus, X, ChevronRight, Pencil, GripVertical, Building2, BriefcaseBusiness, Hash, ListChecks } from "lucide-react"
 import {
@@ -28,6 +29,7 @@ import {
   SidebarContent,
   SidebarGroup,
   SidebarGroupLabel,
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
@@ -36,6 +38,13 @@ import {
   SidebarMenuSubItem,
   SidebarMenuSubButton,
 } from "@/components/ui/sidebar"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Dialog,
   DialogContent,
@@ -166,6 +175,7 @@ function SortableScoringTab({
 }
 
 export default function AppSidebar({
+  defaultEnvironment = "prod",
   activeTab,
   scoringTabs,
   organizations,
@@ -203,6 +213,8 @@ export default function AppSidebar({
   onCreateContextPrompt,
   isCreatingContextPrompt,
 }: AppSidebarProps) {
+  const router = useRouter()
+  const [environment, setEnvironment] = useState<"dev" | "prod">(defaultEnvironment)
   const [isDragging, setIsDragging] = useState(false)
   const [isCreateRoleOpen, setIsCreateRoleOpen] = useState(false)
   const [assessmentInstanceName, setAssessmentInstanceName] = useState("")
@@ -290,6 +302,25 @@ export default function AppSidebar({
   return (
     <TooltipProvider>
     <Sidebar>
+      <SidebarHeader className="border-b border-sidebar-border p-2">
+        <Select
+          value={environment}
+          onValueChange={(v) => {
+            const newEnv = v as "dev" | "prod"
+            setEnvironment(newEnv)
+            document.cookie = `environment=${newEnv}; path=/; max-age=31536000`
+            router.refresh()
+          }}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="dev">dev</SelectItem>
+            <SelectItem value="prod">prod</SelectItem>
+          </SelectContent>
+        </Select>
+      </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>

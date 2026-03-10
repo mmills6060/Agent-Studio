@@ -71,9 +71,10 @@ const firstScoringTab = createScoringPromptTab()
 
 interface PromptWorkspaceProps {
   organizations: AppSidebarOrganization[]
+  defaultEnvironment?: "dev" | "prod"
 }
 
-export default function PromptWorkspace({ organizations }: PromptWorkspaceProps) {
+export default function PromptWorkspace({ organizations, defaultEnvironment = "prod" }: PromptWorkspaceProps) {
   const [activeTab, setActiveTab] = useState<string>("call-prompt")
   const [selectedOrganizationId, setSelectedOrganizationId] = useState<string | null>(null)
   const [jobRoles, setJobRoles] = useState<AppSidebarJobRole[]>([])
@@ -701,6 +702,7 @@ export default function PromptWorkspace({ organizations }: PromptWorkspaceProps)
   return (
     <SidebarProvider>
       <AppSidebar
+        defaultEnvironment={defaultEnvironment}
         activeTab={activeTab}
         scoringTabs={scoringTabs}
         organizations={organizations}

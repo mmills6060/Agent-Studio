@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 
 import { executeSqlQuery, SqlQueryValidationError } from "@/lib/database"
+import { getEnvironment } from "@/lib/environment"
 
 function parseFirstPositionId(positionIds: unknown): string | null {
   if (typeof positionIds !== "string")
@@ -44,6 +45,7 @@ export async function GET(request: Request) {
       { status: 400 },
     )
 
+  const environment = await getEnvironment()
   try {
     const roleResult = await executeSqlQuery(
       `
@@ -53,6 +55,7 @@ export async function GET(request: Request) {
         LIMIT 1
       `,
       [roleId],
+      environment,
     )
 
     if (roleResult.rowCount === 0)
@@ -73,6 +76,7 @@ export async function GET(request: Request) {
         LIMIT 1
       `,
       [firstPositionId],
+      environment,
     )
 
     const assessmentInstanceId = toStringValue(jobPositionResult.rows[0]?.AssessmentInstanceID)
@@ -87,6 +91,7 @@ export async function GET(request: Request) {
         LIMIT 1
       `,
       [assessmentInstanceId],
+      environment,
     )
 
     const assessmentId = toStringValue(assessmentInstanceResult.rows[0]?.AssessmentID)
@@ -101,6 +106,7 @@ export async function GET(request: Request) {
         LIMIT 1
       `,
       [assessmentId],
+      environment,
     )
 
     const taskIds = parseDelimitedIds(assessmentsResult.rows[0]?.Tasks)
@@ -117,6 +123,7 @@ export async function GET(request: Request) {
         AND PromptID IS NOT NULL
       `,
       taskIds,
+      environment,
     )
 
     return NextResponse.json({

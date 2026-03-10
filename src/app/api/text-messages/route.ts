@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { executeSqlMutation, SqlQueryValidationError } from "@/lib/database"
+import { getEnvironment } from "@/lib/environment"
 
 interface CreateTextMessagesRequest {
   orgId?: unknown
@@ -41,6 +42,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "messages array is required" }, { status: 400 })
 
   const messages = body.messages as TextMessageInput[]
+  const environment = await getEnvironment()
 
   try {
     const insertedIds: number[] = []
@@ -60,6 +62,7 @@ export async function POST(request: Request) {
           msg.messageContent,
           msg.associatedRoleId ?? null,
         ],
+        environment,
       )
 
       if (!result.insertId)

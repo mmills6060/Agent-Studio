@@ -5,6 +5,7 @@ import {
   executeSqlQuery,
   SqlQueryValidationError,
 } from "@/lib/database"
+import { getEnvironment } from "@/lib/environment"
 
 interface UpdateContextPromptRequest {
   promptId?: unknown
@@ -136,6 +137,7 @@ export async function GET(request: Request) {
       { status: 400 },
     )
 
+  const environment = await getEnvironment()
   try {
     const whereClause = promptId ? "PromptId = ?" : "TaskId = ?"
     const paramValue = promptId || taskId
@@ -148,6 +150,7 @@ export async function GET(request: Request) {
         ORDER BY CreatedAt DESC
       `,
       [paramValue],
+      environment,
     )
 
     return NextResponse.json({
@@ -189,6 +192,7 @@ export async function POST(request: Request) {
 
   const prompt = parseStringValue(body.prompt) || DEFAULT_CONTEXT_PROMPT
 
+  const environment = await getEnvironment()
   try {
     const now = new Date().toISOString().slice(0, 19).replace("T", " ")
 
@@ -199,6 +203,7 @@ export async function POST(request: Request) {
         VALUES (?, ?, ?, ?)
       `,
       [taskId, prompt, now, now],
+      environment,
     )
 
     const promptId = result.insertId
@@ -212,6 +217,7 @@ export async function POST(request: Request) {
         WHERE TaskID = ?
       `,
       [promptId, taskId],
+      environment,
     )
 
     return NextResponse.json({
@@ -256,6 +262,7 @@ export async function PATCH(request: Request) {
       { status: 400 },
     )
 
+  const environment = await getEnvironment()
   try {
     const now = new Date().toISOString().slice(0, 19).replace("T", " ")
 
@@ -267,6 +274,7 @@ export async function PATCH(request: Request) {
         LIMIT 1
       `,
       [prompt, now, promptId],
+      environment,
     )
 
     if (result.affectedRows === 0)

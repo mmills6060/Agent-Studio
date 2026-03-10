@@ -5,6 +5,7 @@ import {
   SqlQueryValidationError,
   testDatabaseConnection,
 } from "@/lib/database"
+import { getEnvironment } from "@/lib/environment"
 
 interface SqlQueryRequest {
   query: string
@@ -12,8 +13,9 @@ interface SqlQueryRequest {
 }
 
 export async function GET() {
+  const environment = await getEnvironment()
   try {
-    const result = await testDatabaseConnection()
+    const result = await testDatabaseConnection(environment)
     return NextResponse.json(result)
   } catch (err) {
     if (err instanceof SqlQueryValidationError)
@@ -57,8 +59,9 @@ export async function POST(request: Request) {
       { status: 400 },
     )
 
+  const environment = await getEnvironment()
   try {
-    const result = await executeSqlQuery(query, params)
+    const result = await executeSqlQuery(query, params, environment)
     return NextResponse.json(result)
   } catch (err) {
     if (err instanceof SqlQueryValidationError)

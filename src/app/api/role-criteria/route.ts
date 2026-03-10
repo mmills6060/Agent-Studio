@@ -6,6 +6,7 @@ import {
   executeSqlQuery,
   SqlQueryValidationError,
 } from "@/lib/database"
+import { getEnvironment } from "@/lib/environment"
 
 function parseFirstPositionId(positionIds: unknown): string | null {
   if (typeof positionIds !== "string")
@@ -56,6 +57,7 @@ export async function GET(request: Request) {
       { status: 400 },
     )
 
+  const environment = await getEnvironment()
   try {
     const roleResult = await executeSqlQuery(
       `
@@ -85,6 +87,7 @@ export async function GET(request: Request) {
         LIMIT 1
       `,
       [firstPositionId],
+      environment,
     )
 
     const assessmentInstanceId = toStringValue(jobPositionResult.rows[0]?.AssessmentInstanceID)
@@ -99,6 +102,7 @@ export async function GET(request: Request) {
         LIMIT 1
       `,
       [assessmentInstanceId],
+      environment,
     )
 
     const assessmentId = toStringValue(assessmentInstanceResult.rows[0]?.AssessmentID)
@@ -113,6 +117,7 @@ export async function GET(request: Request) {
         LIMIT 1
       `,
       [assessmentId],
+      environment,
     )
 
     const taskIds = parseDelimitedIds(assessmentsResult.rows[0]?.Tasks)
@@ -128,6 +133,7 @@ export async function GET(request: Request) {
         AND PromptID IS NOT NULL
       `,
       taskIds,
+      environment,
     )
 
     const criteriaIds = new Set<string>()
@@ -159,6 +165,7 @@ export async function GET(request: Request) {
         WHERE CriteriaID IN (${criteriaPlaceholders})
       `,
       uniqueCriteriaIds,
+      environment,
     )
 
     const criteriaNameById = new Map<string, string>()
@@ -290,7 +297,8 @@ async function insertIndicatorNode(
   indicatorDescription: string,
   minScore: number,
   maxScore: number,
-) : Promise<string> {
+  environment: "dev" | "prod",
+): Promise<string> {
   try {
     const indicatorResult = await executeSqlMutation(
       `
@@ -299,6 +307,7 @@ async function insertIndicatorNode(
         VALUES (?, ?, ?, ?)
       `,
       [criteriaName, indicatorDescription, minScore, maxScore],
+      environment,
     )
     const indicatorId = indicatorResult.insertId
     if (indicatorId)
@@ -315,6 +324,7 @@ async function insertIndicatorNode(
         VALUES (?, ?, ?)
       `,
       [criteriaName, minScore, maxScore],
+      environment,
     )
     const indicatorId = indicatorResult.insertId
     if (indicatorId)
@@ -331,6 +341,7 @@ async function insertIndicatorNode(
         VALUES (?, ?, ?)
       `,
       [indicatorDescription, minScore, maxScore],
+      environment,
     )
     const indicatorId = indicatorResult.insertId
     if (indicatorId)
@@ -346,6 +357,7 @@ async function insertIndicatorNode(
       VALUES (?, ?)
     `,
     [minScore, maxScore],
+    environment,
   )
   const fallbackIndicatorId = fallbackIndicatorResult.insertId
   if (!fallbackIndicatorId)
@@ -359,6 +371,7 @@ async function linkTaskCriteriaIndicator(
   criteriaId: string,
   indicatorId: string,
   scoringPrompt: string,
+  environment: "dev" | "prod",
 ) {
   try {
     await executeSqlMutation(
@@ -368,6 +381,7 @@ async function linkTaskCriteriaIndicator(
         VALUES (?, ?, ?, ?)
       `,
       [taskId, criteriaId, indicatorId, scoringPrompt],
+      environment,
     )
     return
   } catch {
@@ -381,6 +395,7 @@ async function linkTaskCriteriaIndicator(
       VALUES (?, ?, ?)
     `,
     [taskId, criteriaId, indicatorId],
+    environment,
   )
 }
 
@@ -438,6 +453,7 @@ export async function POST(request: Request) {
       { status: 400 },
     )
 
+  const environment = await getEnvironment()
   try {
     const roleResult = await executeSqlQuery(
       `
@@ -447,6 +463,7 @@ export async function POST(request: Request) {
         LIMIT 1
       `,
       [roleId],
+      environment,
     )
 
     if (roleResult.rowCount === 0)
@@ -470,6 +487,7 @@ export async function POST(request: Request) {
         LIMIT 1
       `,
       [firstPositionId],
+      environment,
     )
 
     const assessmentInstanceId = toStringValue(jobPositionResult.rows[0]?.AssessmentInstanceID)
@@ -487,6 +505,7 @@ export async function POST(request: Request) {
         LIMIT 1
       `,
       [assessmentInstanceId],
+      environment,
     )
 
     const assessmentId = toStringValue(assessmentInstanceResult.rows[0]?.AssessmentID)
@@ -504,6 +523,7 @@ export async function POST(request: Request) {
         LIMIT 1
       `,
       [assessmentId],
+      environment,
     )
 
     const taskIds = parseDelimitedIds(assessmentsResult.rows[0]?.Tasks)
@@ -522,6 +542,7 @@ export async function POST(request: Request) {
         AND PromptID = ?
       `,
       [...taskIds, promptId],
+      environment,
     )
 
     if (taskResult.rowCount === 0)
@@ -538,6 +559,7 @@ export async function POST(request: Request) {
           VALUES (?, ?)
         `,
         [criteriaName, criteriaName],
+        environment,
       )
     } catch {
       criteriaResult = await executeSqlMutation(
@@ -546,6 +568,7 @@ export async function POST(request: Request) {
           VALUES (?)
         `,
         [criteriaName],
+        environment,
       )
     }
 
@@ -565,6 +588,7 @@ export async function POST(request: Request) {
       indicatorDescription,
       minScore,
       maxScore,
+      environment,
     )
 
     await executeSqlMutation(
@@ -574,6 +598,7 @@ export async function POST(request: Request) {
         WHERE CriteriaID = ?
       `,
       [indicatorId, createdCriteriaId],
+      environment,
     )
 
     for (const row of taskResult.rows as TaskRow[]) {
@@ -592,9 +617,10 @@ export async function POST(request: Request) {
           WHERE TaskID = ?
         `,
         [[...mergedCriteriaIds].join(","), taskId],
+        environment,
       )
 
-      await linkTaskCriteriaIndicator(taskId, createdCriteriaId, indicatorId, scoringPrompt)
+      await linkTaskCriteriaIndicator(taskId, createdCriteriaId, indicatorId, scoringPrompt, environment)
     }
 
     return NextResponse.json({

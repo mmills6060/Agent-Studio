@@ -5,6 +5,7 @@ import {
   executeSqlQuery,
   SqlQueryValidationError,
 } from "@/lib/database"
+import { getEnvironment } from "@/lib/environment"
 
 interface CreateJobRoleRequest {
   orgId?: unknown
@@ -110,6 +111,7 @@ export async function GET(request: Request) {
       { status: 400 },
     )
 
+  const environment = await getEnvironment()
   try {
     const result = await executeSqlQuery(
       `
@@ -139,6 +141,7 @@ export async function GET(request: Request) {
         ORDER BY jr.RoleDescription ASC
       `,
       [orgId],
+      environment,
     )
 
     return NextResponse.json(result)
@@ -192,6 +195,7 @@ export async function POST(request: Request) {
       { status: 400 },
     )
 
+  const environment = await getEnvironment()
   try {
     const assessmentResult = await executeSqlMutation(
       `
@@ -199,6 +203,7 @@ export async function POST(request: Request) {
         VALUES (?)
       `,
       [""],
+      environment,
     )
 
     const assessmentId = assessmentResult.insertId
@@ -211,6 +216,7 @@ export async function POST(request: Request) {
         VALUES (?, ?, ?)
       `,
       [assessmentId, assessmentInstanceName, "JOB"],
+      environment,
     )
 
     const assessmentInstanceId = assessmentInstanceResult.insertId
@@ -225,6 +231,7 @@ export async function POST(request: Request) {
         LIMIT 1
       `,
       [orgId],
+      environment,
     )
 
     const nextAssessmentInstanceIdValue = String(assessmentInstanceId)
@@ -235,6 +242,7 @@ export async function POST(request: Request) {
           VALUES (?, ?)
         `,
         [orgId, nextAssessmentInstanceIdValue],
+        environment,
       )
     } else {
       const existingAssessmentInstanceIds = parseDelimitedIds(
@@ -251,6 +259,7 @@ export async function POST(request: Request) {
           WHERE IndustryID = ?
         `,
         [updatedAssessmentInstanceIds, orgId],
+        environment,
       )
     }
 
@@ -261,6 +270,7 @@ export async function POST(request: Request) {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       ["", roleDescription, "", orgId, "Active", "", "CallCenterRoleImageValpak.jpg", "", 0, 0],
+      environment,
     )
 
     const roleId = roleResult.insertId
@@ -273,6 +283,7 @@ export async function POST(request: Request) {
         VALUES (?, ?, ?)
       `,
       [promptString, "Voice", defaultPromptAgentMetadata],
+      environment,
     )
 
     const promptId = promptResult.insertId
@@ -285,6 +296,7 @@ export async function POST(request: Request) {
         VALUES (?, ?, ?, ?)
       `,
       [null, "", "Welcome", ""],
+      environment,
     )
 
     const welcomeTaskId = welcomeTaskResult.insertId
@@ -297,6 +309,7 @@ export async function POST(request: Request) {
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `,
       [promptId, "", "{}", defaultPhoneCallTaskMedia, "Phone Call", "OutboundPhoneCall", 1],
+      environment,
     )
 
     const phoneCallTaskId = phoneCallTaskResult.insertId
@@ -312,6 +325,7 @@ export async function POST(request: Request) {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [orgId, phoneCallTaskId, "Deepgram", "enhanced", "en-US", null, 1, 0, keywords ? JSON.stringify(keywords.split(",").map((k) => k.trim()).filter(Boolean)) : "[]", null, null, 1],
+      environment,
     )
 
     await executeSqlMutation(
@@ -321,6 +335,7 @@ export async function POST(request: Request) {
         WHERE AssessmentID = ?
       `,
       [`${welcomeTaskId},${phoneCallTaskId}`, assessmentId],
+      environment,
     )
 
     const jobPositionResult = await executeSqlMutation(
@@ -330,6 +345,7 @@ export async function POST(request: Request) {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [roleDescription, "", "", "Active", "", assessmentInstanceId, "", "", roleId, 0, 0],
+      environment,
     )
 
     const jobPositionId = jobPositionResult.insertId
@@ -343,6 +359,7 @@ export async function POST(request: Request) {
         WHERE RoleID = ?
       `,
       [String(jobPositionId), roleId],
+      environment,
     )
 
     const responseBody: CreateJobRoleResponse = {

@@ -5,6 +5,7 @@ import {
   executeSqlQuery,
   SqlQueryValidationError,
 } from "@/lib/database"
+import { getEnvironment } from "@/lib/environment"
 
 interface UpdatePromptStringRequest {
   promptId?: unknown
@@ -35,6 +36,7 @@ export async function GET(request: Request) {
       { status: 400 },
     )
 
+  const environment = await getEnvironment()
   try {
     const result = await executeSqlQuery(
       `
@@ -44,6 +46,7 @@ export async function GET(request: Request) {
         LIMIT 1
       `,
       [promptId],
+      environment,
     )
 
     if (result.rowCount === 0)
@@ -95,6 +98,7 @@ export async function PATCH(request: Request) {
       { status: 400 },
     )
 
+  const environment = await getEnvironment()
   try {
     const result = await executeSqlMutation(
       `
@@ -104,6 +108,7 @@ export async function PATCH(request: Request) {
         LIMIT 1
       `,
       [promptString, promptId],
+      environment,
     )
 
     if (result.affectedRows === 0)

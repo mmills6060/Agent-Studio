@@ -1,5 +1,6 @@
 import type { AppSidebarOrganization } from "@/components/handlers/app-sidebar-handlers"
 import { executeSqlQuery } from "@/lib/database"
+import type { DbEnvironment } from "@/lib/environment"
 
 function parseOrganizationRow(row: Record<string, unknown>): AppSidebarOrganization | null {
   const orgId = row.OrgID
@@ -13,13 +14,18 @@ function parseOrganizationRow(row: Record<string, unknown>): AppSidebarOrganizat
   }
 }
 
-export async function getOrganizations(): Promise<AppSidebarOrganization[]> {
+export async function getOrganizations(environment?: DbEnvironment): Promise<AppSidebarOrganization[]> {
+  const env = environment ?? "prod"
   try {
-    const result = await executeSqlQuery(`
+    const result = await executeSqlQuery(
+      `
       SELECT OrgID, OrgName
       FROM prodtake2ai.Org
       ORDER BY OrgName ASC
-    `)
+    `,
+      [],
+      env,
+    )
 
     return result.rows
       .map((row) => parseOrganizationRow(row))

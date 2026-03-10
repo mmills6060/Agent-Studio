@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 
 import { executeSqlMutation, executeSqlQuery, SqlQueryValidationError } from "@/lib/database"
+import { getEnvironment } from "@/lib/environment"
 
 interface UpdateScoringPromptRequest {
   criteriaId?: unknown
@@ -27,6 +28,7 @@ export async function GET(request: Request) {
       { status: 400 },
     )
 
+  const environment = await getEnvironment()
   try {
     const result = await executeSqlQuery(
       `
@@ -39,6 +41,7 @@ export async function GET(request: Request) {
         LIMIT 1
       `,
       [criteriaId],
+      environment,
     )
 
     if (result.rowCount === 0)
@@ -90,6 +93,7 @@ export async function PATCH(request: Request) {
       { status: 400 },
     )
 
+  const environment = await getEnvironment()
   try {
     const result = await executeSqlMutation(
       `
@@ -98,6 +102,7 @@ export async function PATCH(request: Request) {
         WHERE CriteriaID = ?
       `,
       [scoringPrompt, criteriaId],
+      environment,
     )
 
     if (result.affectedRows === 0)

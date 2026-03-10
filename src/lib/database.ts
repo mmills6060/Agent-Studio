@@ -5,9 +5,12 @@ import type { Readable } from "stream"
 
 const SQL_MUTATION_PATTERN = /\b(insert|update|delete|alter|drop|create|truncate|grant|revoke)\b/i
 const MYSQL_QUERY_TIMEOUT_MS = 30_000
+const PROD_DATABASE_NAME = "prodtake2ai"
 
-let sshClient: Client | null = null
-let sshClientPromise: Promise<Client> | null = null
+type DbEnvironment = "dev" | "prod"
+
+const sshClients: Partial<Record<DbEnvironment, Client>> = {}
+const sshClientPromises: Partial<Record<DbEnvironment, Promise<Client>>> = {}
 
 export class SqlQueryValidationError extends Error {
   statusCode: number
@@ -66,26 +69,50 @@ function parsePort(value: string, envName: string) {
   return port
 }
 
-async function getSshConfig(): Promise<SshConfig> {
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+async function getSshConfig(environment: DbEnvironment = "prod"): Promise<SshConfig> {
   const keyPath = getEnvValue("SSH_KEY_PATH")
   const privateKey = await readFile(keyPath, "utf-8")
 
   return {
-    host: getEnvValue("SSH_HOST"),
+    host:
+      environment === "dev"
+        ? getEnvValue("SSH_HOST_DEV")
+        : getEnvValue("SSH_HOST"),
     port: parsePort(getEnvValue("SSH_PORT"), "SSH_PORT"),
     username: getEnvValue("SSH_USER"),
     privateKey,
   }
 }
 
-function getMysqlConfig(): MysqlConfig {
+function getMysqlConfig(environment?: DbEnvironment): MysqlConfig {
+  const host =
+    environment === "dev"
+      ? getEnvValue("MYSQL_HOST_DEV")
+      : getEnvValue("MYSQL_HOST")
+  const database =
+    environment === "dev"
+      ? getEnvValue("MYSQL_DATABASE_DEV")
+      : getEnvValue("MYSQL_DATABASE")
   return {
-    host: getEnvValue("MYSQL_HOST"),
+    host,
     port: parsePort(getEnvValue("MYSQL_PORT"), "MYSQL_PORT"),
     user: getEnvValue("MYSQL_USER"),
     password: getEnvValue("MYSQL_PASSWORD"),
-    database: getEnvValue("MYSQL_DATABASE"),
+    database,
   }
+}
+
+function mapQueryDatabaseForEnvironment(query: string, environment?: DbEnvironment) {
+  const databaseName = getMysqlConfig(environment).database
+  if (databaseName === PROD_DATABASE_NAME)
+    return query
+
+  const pattern = new RegExp(`\\b${escapeRegExp(PROD_DATABASE_NAME)}\\b(?=\\s*\\.)`, "g")
+  return query.replace(pattern, databaseName)
 }
 
 function createSshConnection(config: ConnectConfig): Promise<Client> {
@@ -99,28 +126,30 @@ function createSshConnection(config: ConnectConfig): Promise<Client> {
   })
 }
 
-async function getSshClient() {
-  if (sshClient)
-    return sshClient
+async function getSshClient(environment: DbEnvironment = "prod") {
+  const cacheKey = environment
+  const cachedClient = sshClients[cacheKey]
+  if (cachedClient)
+    return cachedClient
 
-  if (!sshClientPromise) {
-    sshClientPromise = getSshConfig()
+  if (!sshClientPromises[cacheKey]) {
+    sshClientPromises[cacheKey] = getSshConfig(environment)
       .then((config) => createSshConnection(config))
       .then((client) => {
         client.on("close", () => {
-          sshClient = null
-          sshClientPromise = null
+          sshClients[cacheKey] = undefined
+          sshClientPromises[cacheKey] = undefined
         })
-        sshClient = client
+        sshClients[cacheKey] = client
         return client
       })
       .catch((error) => {
-        sshClientPromise = null
+        sshClientPromises[cacheKey] = undefined
         throw error
       })
   }
 
-  return sshClientPromise
+  return sshClientPromises[cacheKey]
 }
 
 function openMysqlStreamOverSsh(client: Client, mysqlConfig: MysqlConfig): Promise<Readable> {
@@ -144,9 +173,10 @@ function openMysqlStreamOverSsh(client: Client, mysqlConfig: MysqlConfig): Promi
 
 async function withMysqlConnection<T>(
   callback: (connection: mysql.Connection) => Promise<T>,
+  environment?: DbEnvironment,
 ): Promise<T> {
-  const mysqlConfig = getMysqlConfig()
-  const client = await getSshClient()
+  const mysqlConfig = getMysqlConfig(environment)
+  const client = await getSshClient(environment)
   const stream = await openMysqlStreamOverSsh(client, mysqlConfig)
 
   const connection = await mysql.createConnection({
@@ -170,6 +200,7 @@ function isMutationQuery(query: string) {
 export async function executeSqlQuery(
   query: string,
   params: unknown[] = [],
+  environment?: DbEnvironment,
 ): Promise<SqlExecutionResult> {
   if (!query.trim())
     throw new SqlQueryValidationError("query is required")
@@ -184,12 +215,16 @@ export async function executeSqlQuery(
       403,
     )
 
-  const result = await withMysqlConnection((connection) =>
-    connection.query({
-      sql: query,
-      values: params,
-      timeout: MYSQL_QUERY_TIMEOUT_MS,
-    }),
+  const sql = mapQueryDatabaseForEnvironment(query, environment)
+
+  const result = await withMysqlConnection(
+    (connection) =>
+      connection.query({
+        sql,
+        values: params,
+        timeout: MYSQL_QUERY_TIMEOUT_MS,
+      }),
+    environment,
   )
 
   const rows = Array.isArray(result[0]) ? result[0] : []
@@ -204,6 +239,7 @@ export async function executeSqlQuery(
 export async function executeSqlMutation(
   query: string,
   params: unknown[] = [],
+  environment?: DbEnvironment,
 ): Promise<SqlMutationResult> {
   if (!query.trim())
     throw new SqlQueryValidationError("query is required")
@@ -216,12 +252,16 @@ export async function executeSqlMutation(
       "executeSqlMutation only accepts mutating SQL statements",
     )
 
-  const result = await withMysqlConnection((connection) =>
-    connection.query({
-      sql: query,
-      values: params,
-      timeout: MYSQL_QUERY_TIMEOUT_MS,
-    }),
+  const sql = mapQueryDatabaseForEnvironment(query, environment)
+
+  const result = await withMysqlConnection(
+    (connection) =>
+      connection.query({
+        sql,
+        values: params,
+        timeout: MYSQL_QUERY_TIMEOUT_MS,
+      }),
+    environment,
   )
 
   const rows = Array.isArray(result[0]) ? result[0] : []
@@ -240,12 +280,16 @@ export async function executeSqlMutation(
   }
 }
 
-export async function testDatabaseConnection(): Promise<DatabaseConnectionResult> {
-  await withMysqlConnection((connection) =>
-    connection.query({
-      sql: "SELECT 1",
-      timeout: MYSQL_QUERY_TIMEOUT_MS,
-    }),
+export async function testDatabaseConnection(
+  environment?: DbEnvironment,
+): Promise<DatabaseConnectionResult> {
+  await withMysqlConnection(
+    (connection) =>
+      connection.query({
+        sql: "SELECT 1",
+        timeout: MYSQL_QUERY_TIMEOUT_MS,
+      }),
+    environment,
   )
 
   return {

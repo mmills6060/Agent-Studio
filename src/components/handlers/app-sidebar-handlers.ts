@@ -22,6 +22,7 @@ interface AppSidebarCriteria {
 }
 
 interface AppSidebarProps {
+  defaultEnvironment?: "dev" | "prod"
   activeTab: string
   scoringTabs: ScoringPromptTab[]
   organizations: AppSidebarOrganization[]
