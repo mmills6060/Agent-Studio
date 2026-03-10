@@ -126,6 +126,11 @@ function createSshConnection(config: ConnectConfig): Promise<Client> {
   })
 }
 
+function resetSshCache(environment: DbEnvironment) {
+  sshClients[environment] = undefined
+  sshClientPromises[environment] = undefined
+}
+
 async function getSshClient(environment: DbEnvironment = "prod") {
   const cacheKey = environment
   const cachedClient = sshClients[cacheKey]
@@ -134,17 +139,23 @@ async function getSshClient(environment: DbEnvironment = "prod") {
 
   if (!sshClientPromises[cacheKey]) {
     sshClientPromises[cacheKey] = getSshConfig(environment)
-      .then((config) => createSshConnection(config))
+      .then((config) =>
+        createSshConnection({
+          ...config,
+          keepaliveInterval: 15_000,
+          keepaliveCountMax: 3,
+          readyTimeout: 20_000,
+        }),
+      )
       .then((client) => {
-        client.on("close", () => {
-          sshClients[cacheKey] = undefined
-          sshClientPromises[cacheKey] = undefined
-        })
+        client.on("close", () => resetSshCache(cacheKey))
+        client.on("end", () => resetSshCache(cacheKey))
+        client.on("error", () => resetSshCache(cacheKey))
         sshClients[cacheKey] = client
         return client
       })
       .catch((error) => {
-        sshClientPromises[cacheKey] = undefined
+        resetSshCache(cacheKey)
         throw error
       })
   }
