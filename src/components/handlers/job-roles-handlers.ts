@@ -43,6 +43,12 @@ function parseJobRole(row: Record<string, unknown>): AppSidebarJobRole | null {
   if ((typeof roleId !== "number" && typeof roleId !== "string") || typeof roleDescription !== "string")
     return null
 
+  const rawAssessmentInstanceName = row.AssessmentInstanceName
+  const assessmentInstanceName =
+    typeof rawAssessmentInstanceName === "string" && rawAssessmentInstanceName.trim().length > 0
+      ? rawAssessmentInstanceName
+      : null
+
   const rawContextId = row.ContextPromptId
   const contextPromptId =
     typeof rawContextId === "number" || typeof rawContextId === "string"
@@ -58,6 +64,7 @@ function parseJobRole(row: Record<string, unknown>): AppSidebarJobRole | null {
   return {
     roleId: String(roleId),
     roleDescription,
+    assessmentInstanceName,
     contextPromptId,
     phoneCallTaskId,
   }
@@ -80,9 +87,16 @@ export async function getJobRolesByOrganization(orgId: string): Promise<AppSideb
     throw new Error(body?.error ?? "Failed to fetch job roles")
 
   const rows = Array.isArray(body?.rows) ? body.rows : []
-  return rows
+  const parsedRoles = rows
     .map((row) => parseJobRole(row))
     .filter((role): role is AppSidebarJobRole => role !== null)
+
+  const uniqueRolesById = new Map<string, AppSidebarJobRole>()
+  for (const role of parsedRoles)
+    if (!uniqueRolesById.has(role.roleId))
+      uniqueRolesById.set(role.roleId, role)
+
+  return [...uniqueRolesById.values()]
 }
 
 export async function createJobRole(input: CreateJobRoleInput & { promptString?: string }): Promise<CreatedJobRole> {

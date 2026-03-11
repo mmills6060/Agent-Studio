@@ -117,18 +117,10 @@ export async function GET(request: Request) {
       `
         SELECT
           jr.RoleID,
-          jr.RoleLink,
           jr.RoleDescription,
-          jr.PositionIDs,
-          jr.OrgID,
-          jr.Status,
-          jr.RoleFile,
-          jr.RoleImage,
-          jr.RoleCode,
-          jr.isDemo,
-          jr.IsHidden,
-          t.promptToGenerateContextForCandidateId AS ContextPromptId,
-          t.TaskID AS PhoneCallTaskId
+          MAX(ai.AssessmentInstanceName) AS AssessmentInstanceName,
+          MAX(t.promptToGenerateContextForCandidateId) AS ContextPromptId,
+          MAX(t.TaskID) AS PhoneCallTaskId
         FROM prodtake2ai.JobRoles jr
         LEFT JOIN prodtake2ai.JobPositions jp ON jp.RoleID = jr.RoleID
         LEFT JOIN prodtake2ai.AssessmentInstances ai ON ai.AssessmentInstanceID = jp.AssessmentInstanceID
@@ -138,6 +130,7 @@ export async function GET(request: Request) {
           AND t.TaskModality = 'Phone Call'
           AND t.TaskSubModality = 'OutboundPhoneCall'
         WHERE jr.OrgID = ?
+        GROUP BY jr.RoleID, jr.RoleDescription
         ORDER BY jr.RoleDescription ASC
       `,
       [orgId],

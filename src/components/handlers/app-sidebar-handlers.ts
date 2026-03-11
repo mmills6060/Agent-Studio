@@ -8,6 +8,7 @@ interface AppSidebarOrganization {
 interface AppSidebarJobRole {
   roleId: string
   roleDescription: string
+  assessmentInstanceName: string | null
   contextPromptId: string | null
   phoneCallTaskId: string | null
 }

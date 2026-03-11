@@ -493,11 +493,13 @@ export default function AppSidebar({
                                     className="w-full text-left"
                                   >
                                     <BriefcaseBusiness />
-                                    <span>{jobRole.assessmentInstanceName ?? jobRole.roleDescription}</span>
+                                    <span>{jobRole.roleDescription}</span>
                                   </button>
                                 </SidebarMenuSubButton>
                               </TooltipTrigger>
-                              <TooltipContent side="right">{jobRole.assessmentInstanceName ?? jobRole.roleDescription}</TooltipContent>
+                              <TooltipContent side="right">
+                                {jobRole.assessmentInstanceName ?? jobRole.roleDescription}
+                              </TooltipContent>
                             </Tooltip>
                             {selectedJobRoleId === jobRole.roleId && (
                               <SidebarMenuSub>
