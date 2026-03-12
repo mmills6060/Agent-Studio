@@ -21,7 +21,7 @@ import {
 import type { ScoringNodeData } from "@/components/handlers/scoring-flow-canvas-handlers"
 import { generateScoringPrompt } from "@/components/handlers/scoring-flow-canvas-handlers"
 import type { ContextNodeData } from "@/components/handlers/context-flow-canvas-handlers"
-import { Play, Upload, MessageSquare, BarChart3, Save, Check, Trash2, Wand2, PlayCircle, Square, UploadCloud, Loader2 } from "lucide-react"
+import { Play, Upload, MessageSquare, BarChart3, Save, Check, Trash2, Wand2, PlayCircle, Square, UploadCloud, Loader2, Braces } from "lucide-react"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
@@ -50,7 +50,16 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
 import { DEFAULT_RESUME_JSON } from "@/lib/default-resume"
 import { runContextPrompt } from "@/components/handlers/context-prompt-run-handlers"
 import { getCriteriaScoringPromptById, updateCriteriaScoringPrompt } from "@/components/handlers/criteria-scoring-prompt-handlers"
@@ -59,6 +68,14 @@ import { createCandidateContextPrompt, getCandidateContextPrompt, updateCandidat
 import { getPromptReferencesByRole } from "@/components/handlers/prompt-references-handlers"
 import { getPromptStringById } from "@/components/handlers/prompt-string-handlers"
 import { updatePromptStringById } from "@/components/handlers/update-prompt-string-handlers"
+import {
+  applyPrimitiveMetadataChange,
+  formatPrimitiveMetadataValue,
+  getPromptAgentMetadataById,
+  parseAgentMetadataRecord,
+  stringifyAgentMetadataRecord,
+  updatePromptAgentMetadataById,
+} from "@/components/handlers/prompt-agent-metadata-handlers"
 import { getCriteriaByRole } from "@/components/handlers/role-criteria-handlers"
 import { createCriteriaNode } from "@/components/handlers/create-criteria-node-handlers"
 import { loadAllRoleScoringPrompts } from "@/components/handlers/load-all-role-scoring-prompts-handlers"
@@ -72,6 +89,73 @@ const firstScoringTab = createScoringPromptTab()
 interface PromptWorkspaceProps {
   organizations: AppSidebarOrganization[]
   defaultEnvironment?: "dev" | "prod"
+}
+
+interface AgentMetadataFieldEditorProps {
+  fieldKey: string
+  value: unknown
+  path: Array<string | number>
+  onPrimitiveChange: (path: Array<string | number>, nextRawValue: string) => void
+}
+
+function isEditableMetadataObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+}
+
+function AgentMetadataFieldEditor({
+  fieldKey,
+  value,
+  path,
+  onPrimitiveChange,
+}: AgentMetadataFieldEditorProps) {
+  if (Array.isArray(value)) {
+    return (
+      <div className="space-y-2 rounded-md border bg-background p-3">
+        <p className="text-sm font-medium text-foreground">{fieldKey}</p>
+        <div className="space-y-2 pl-2">
+          {value.map((entryValue, entryIndex) => (
+            <AgentMetadataFieldEditor
+              key={`${fieldKey}-${entryIndex}`}
+              fieldKey={`[${entryIndex}]`}
+              value={entryValue}
+              path={[...path, entryIndex]}
+              onPrimitiveChange={onPrimitiveChange}
+            />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (isEditableMetadataObject(value)) {
+    return (
+      <div className="space-y-2 rounded-md border bg-background p-3">
+        <p className="text-sm font-medium text-foreground">{fieldKey}</p>
+        <div className="space-y-2 pl-2">
+          {Object.entries(value).map(([nestedKey, nestedValue]) => (
+            <AgentMetadataFieldEditor
+              key={`${fieldKey}-${nestedKey}`}
+              fieldKey={nestedKey}
+              value={nestedValue}
+              path={[...path, nestedKey]}
+              onPrimitiveChange={onPrimitiveChange}
+            />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="grid gap-2 sm:grid-cols-[220px_minmax(0,1fr)] sm:items-center">
+      <label className="text-sm text-foreground">{fieldKey}</label>
+      <Input
+        value={formatPrimitiveMetadataValue(value)}
+        onChange={(event) => onPrimitiveChange(path, event.target.value)}
+        className="h-8"
+      />
+    </div>
+  )
 }
 
 export default function PromptWorkspace({ organizations, defaultEnvironment = "prod" }: PromptWorkspaceProps) {
@@ -101,6 +185,12 @@ export default function PromptWorkspace({ organizations, defaultEnvironment = "p
   const [conversationMessages, setConversationMessages] = useState<ConversationMessage[]>([])
   const [isScoringResultsOpen, setIsScoringResultsOpen] = useState(false)
   const [isWizardOpen, setIsWizardOpen] = useState(false)
+  const [isAgentMetadataOpen, setIsAgentMetadataOpen] = useState(false)
+  const [agentMetadataFields, setAgentMetadataFields] = useState<Record<string, unknown> | null>(null)
+  const [agentMetadataError, setAgentMetadataError] = useState<string | null>(null)
+  const [isLoadingAgentMetadata, setIsLoadingAgentMetadata] = useState(false)
+  const [isSavingAgentMetadata, setIsSavingAgentMetadata] = useState(false)
+  const [isAgentMetadataSaved, setIsAgentMetadataSaved] = useState(false)
   const [contextPromptState, setContextPromptState] = useState<{
     nodes: Node<ContextNodeData>[]
     edges: Edge[]
@@ -393,6 +483,97 @@ export default function PromptWorkspace({ organizations, defaultEnvironment = "p
     else if (isContextPrompt) contextFlowCanvasRef.current?.viewPrompt()
     else canvasRef.current?.viewPrompt()
   }, [isCallPrompt, isContextPrompt])
+
+  const handleLoadAgentMetadata = useCallback(async (promptIdToLoad: string) => {
+    const promptId = promptIdToLoad.trim()
+    if (!promptId) {
+      setAgentMetadataError("Select and load a prompt before editing metadata")
+      return
+    }
+
+    setIsLoadingAgentMetadata(true)
+    setAgentMetadataError(null)
+    setIsAgentMetadataSaved(false)
+    try {
+      const agentMetadataJson = await getPromptAgentMetadataById(promptId)
+      const parsedResult = parseAgentMetadataRecord(agentMetadataJson)
+      if (parsedResult.error) {
+        setAgentMetadataFields(null)
+        setAgentMetadataError(parsedResult.error)
+        return
+      }
+
+      setAgentMetadataFields(parsedResult.metadata)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to load agent metadata"
+      setAgentMetadataFields(null)
+      setAgentMetadataError(message)
+    } finally {
+      setIsLoadingAgentMetadata(false)
+    }
+  }, [])
+
+  const handleOpenAgentMetadata = useCallback(() => {
+    const promptId = activeProductionPromptId ?? ""
+    if (!promptId) {
+      setAgentMetadataFields(null)
+      setAgentMetadataError("Select and load a prompt before editing metadata")
+      setIsAgentMetadataOpen(true)
+      return
+    }
+
+    setIsAgentMetadataOpen(true)
+    setAgentMetadataError(null)
+    setIsAgentMetadataSaved(false)
+    setAgentMetadataFields(null)
+    void handleLoadAgentMetadata(promptId)
+  }, [activeProductionPromptId, handleLoadAgentMetadata])
+
+  const handleAgentMetadataPrimitiveChange = useCallback((path: Array<string | number>, nextRawValue: string) => {
+    setIsAgentMetadataSaved(false)
+    setAgentMetadataError(null)
+    setAgentMetadataFields((previousMetadata) => {
+      if (!previousMetadata)
+        return previousMetadata
+
+      const updatedResult = applyPrimitiveMetadataChange(previousMetadata, path, nextRawValue)
+      if (updatedResult.error) {
+        setAgentMetadataError(updatedResult.error)
+        return previousMetadata
+      }
+
+      return updatedResult.metadata
+    })
+  }, [])
+
+  const handleSaveAgentMetadata = useCallback(async () => {
+    const promptId = (activeProductionPromptId ?? "").trim()
+    if (!promptId) {
+      setAgentMetadataError("Select and load a prompt before saving metadata")
+      return
+    }
+
+    if (!agentMetadataFields) {
+      setAgentMetadataError("Load metadata before saving")
+      return
+    }
+
+    setIsSavingAgentMetadata(true)
+    setAgentMetadataError(null)
+    setIsAgentMetadataSaved(false)
+    try {
+      await updatePromptAgentMetadataById(
+        promptId,
+        stringifyAgentMetadataRecord(agentMetadataFields),
+      )
+      setIsAgentMetadataSaved(true)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to save agent metadata"
+      setAgentMetadataError(message)
+    } finally {
+      setIsSavingAgentMetadata(false)
+    }
+  }, [activeProductionPromptId, agentMetadataFields])
 
   const handleOpenContextRun = useCallback(() => {
     setIsContextRunOpen(true)
@@ -814,6 +995,16 @@ export default function PromptWorkspace({ organizations, defaultEnvironment = "p
               <Wand2 className="size-4" />
               Wizard
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleOpenAgentMetadata}
+              className="gap-2"
+              disabled={!activeProductionPromptId}
+            >
+              <Braces className="size-4" />
+              Agent metadata
+            </Button>
             <Button variant="outline" size="sm" onClick={handleImport} className="gap-2">
               <Upload className="size-4" />
               Import
@@ -901,6 +1092,78 @@ export default function PromptWorkspace({ organizations, defaultEnvironment = "p
           organizations={organizations}
           defaultOrganizationId={selectedOrganizationId}
         />
+
+        <Dialog
+          open={isAgentMetadataOpen}
+          onOpenChange={(open) => {
+            setIsAgentMetadataOpen(open)
+            if (open)
+              return
+            setAgentMetadataFields(null)
+            setAgentMetadataError(null)
+            setIsLoadingAgentMetadata(false)
+            setIsSavingAgentMetadata(false)
+            setIsAgentMetadataSaved(false)
+          }}
+        >
+          <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-4xl">
+            <DialogHeader className="shrink-0">
+              <DialogTitle>Edit agent metadata</DialogTitle>
+              <DialogDescription>
+                Edit parsed fields from `Prompts.AgentMetadata` for the currently loaded production prompt.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="shrink-0 rounded-md border bg-muted/30 p-2 text-sm text-muted-foreground">
+              Prompt ID: {activeProductionPromptId ?? "Not selected"}
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto rounded-md border bg-muted/30 p-3">
+              {isLoadingAgentMetadata ? (
+                <div className="flex h-full min-h-[220px] items-center justify-center">
+                  <Loader2 className="size-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : !agentMetadataFields ? (
+                <div className="flex h-full min-h-[220px] items-center justify-center text-sm text-muted-foreground">
+                  Load a prompt ID to view editable metadata fields.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {Object.entries(agentMetadataFields).map(([fieldKey, fieldValue]) => (
+                    <AgentMetadataFieldEditor
+                      key={fieldKey}
+                      fieldKey={fieldKey}
+                      value={fieldValue}
+                      path={[fieldKey]}
+                      onPrimitiveChange={handleAgentMetadataPrimitiveChange}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+            {agentMetadataError && (
+              <p className="text-sm text-destructive">{agentMetadataError}</p>
+            )}
+            {isAgentMetadataSaved && !agentMetadataError && (
+              <p className="text-sm text-foreground">Agent metadata saved.</p>
+            )}
+            <DialogFooter className="shrink-0">
+              <Button
+                variant="outline"
+                onClick={() => setIsAgentMetadataOpen(false)}
+                disabled={isSavingAgentMetadata}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => void handleSaveAgentMetadata()}
+                disabled={!agentMetadataFields || isLoadingAgentMetadata || isSavingAgentMetadata}
+                className="gap-2"
+              >
+                {isSavingAgentMetadata && <Loader2 className="size-4 animate-spin" />}
+                {isSavingAgentMetadata ? "Saving..." : "Save metadata"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <Sheet open={isContextRunOpen} onOpenChange={setIsContextRunOpen}>
           <SheetContent className="flex flex-col sm:max-w-2xl">
