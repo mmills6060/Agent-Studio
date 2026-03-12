@@ -205,10 +205,10 @@ export async function POST(request: Request) {
 
     const assessmentInstanceResult = await executeSqlMutation(
       `
-        INSERT INTO prodtake2ai.AssessmentInstances (AssessmentID, AssessmentInstanceName, AssessmentInstanceType)
-        VALUES (?, ?, ?)
+        INSERT INTO prodtake2ai.AssessmentInstances (AssessmentID, AssessmentInstanceName, AssessmentInstanceType, AssessmentDeadlineInDays)
+        VALUES (?, ?, ?, ?)
       `,
-      [assessmentId, assessmentInstanceName, "JOB"],
+      [assessmentId, assessmentInstanceName, "JOB", 0],
       environment,
     )
 
