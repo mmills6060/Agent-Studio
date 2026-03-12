@@ -470,13 +470,14 @@ const ScoringFlow = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
                           className="h-8 w-20 text-center font-mono text-sm"
                         />
                         <span className="text-sm text-muted-foreground">=</span>
-                        <Input
+                        <Textarea
                           value={level.description}
                           onChange={(e) =>
                             handleScoreLevelChange(levelIdx, "description", e.target.value)
                           }
                           placeholder="Description for this score..."
-                          className="h-8 flex-1 text-sm"
+                          rows={1}
+                          className="min-h-8 flex-1 resize-none py-1.5 text-sm"
                         />
                         <Button
                           variant="ghost"
@@ -491,13 +492,14 @@ const ScoringFlow = forwardRef<ScoringFlowCanvasRef, ScoringFlowProps>(
                         {level.examples.map((ex, exIdx) => (
                           <div key={exIdx} className="flex items-center gap-1.5">
                             <span className="text-xs text-muted-foreground">-</span>
-                            <Input
+                            <Textarea
                               value={ex}
                               onChange={(e) =>
                                 handleExampleChange(levelIdx, exIdx, e.target.value)
                               }
                               placeholder="Example response..."
-                              className="h-7 flex-1 text-xs"
+                              rows={1}
+                              className="min-h-7 flex-1 resize-none py-1 text-xs"
                             />
                             <Button
                               variant="ghost"
