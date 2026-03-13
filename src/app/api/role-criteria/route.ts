@@ -240,6 +240,33 @@ function parseNumberValue(value: unknown): number | null {
   return parsedValue
 }
 
+const DEFAULT_SCORING_PROMPT_TEMPLATE = `What this indicator assesses
+Your task is to evaluate a transcript of a conversation between the AI Interviewer and the candidate for SECTION 2: QUALIFICATIONS (CLOSE-ENDED).
+
+Important input: AI Interviewer Questions
+Do you have an active driver's license? What is your highest level of education? If unclear, clarify the credential and whether it is completed. Do you hold an EMT-B, AEMT, or CCMA certification? If yes, clarify which one(s) and whether it is current/active. Are you BLS & CPR Certified? If yes, clarify whether it is current. If no, clarify whether the candidate is willing and able to obtain it. Do you have experience treating patients in their residence?
+
+Scoring Scale with Examples
+
+Driver's License – 10 points
+10 = Holds a license
+0 = Doesn't hold a license
+
+Comfort driving – 0 points
+0 = candidate is comfortable driving to and from the location of the patient
+0 = candidate is not comfortable driving to and from the location of the patient
+
+Scoring Instructions (Required Process)
+Step 1 — Assign points for each attribute separately. If the candidate does not mention an attribute, assign 0. Do not infer willingness, completion status, or certification validity unless explicitly stated. Step 2 — Write a rationale. The rationale must: Be 40 words or fewer. Summarize education status, EMT/AEMT/CCMA certification status, and BLS/CPR status. Match the numeric scores exactly. Use factual, natural language only. Not include assumptions or evaluative commentary.
+"drivers_license_points": <0 or 10>
+"comfort_driving": <0 or 0>
+
+Evaluator Guardrails
+Do not infer, assume, or use information not explicitly stated in the transcript.
+
+Standardized Output Format
+{"rationale": "<text rationale>", "attribute_scores": {"drivers_license_points": <0 or 10>, "comfort_driving": <0 or 0>}}`
+
 function buildFallbackIndicatorDescription(
   criteriaName: string,
   minScore: number,
@@ -373,6 +400,8 @@ async function linkTaskCriteriaIndicator(
   scoringPrompt: string,
   environment: "dev" | "prod",
 ) {
+  const promptToUse = scoringPrompt.trim() || DEFAULT_SCORING_PROMPT_TEMPLATE
+
   try {
     await executeSqlMutation(
       `
@@ -380,7 +409,7 @@ async function linkTaskCriteriaIndicator(
           (TaskID, CriteriaID, IndicatorID, ScoringPrompt, shouldShowRationale)
         VALUES (?, ?, ?, ?, 1)
       `,
-      [taskId, criteriaId, indicatorId, scoringPrompt],
+      [taskId, criteriaId, indicatorId, promptToUse],
       environment,
     )
     return

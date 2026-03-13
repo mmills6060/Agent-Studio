@@ -21,7 +21,7 @@ import {
 import type { ScoringNodeData } from "@/components/handlers/scoring-flow-canvas-handlers"
 import { generateScoringPrompt } from "@/components/handlers/scoring-flow-canvas-handlers"
 import type { ContextNodeData } from "@/components/handlers/context-flow-canvas-handlers"
-import { Play, Upload, MessageSquare, BarChart3, Save, Check, Trash2, Wand2, PlayCircle, Square, UploadCloud, Loader2, Braces } from "lucide-react"
+import { Play, Upload, MessageSquare, BarChart3, Save, Check, Trash2, Wand2, PlayCircle, Square, UploadCloud, Loader2, Braces, SlidersHorizontal } from "lucide-react"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
@@ -76,6 +76,11 @@ import {
   stringifyAgentMetadataRecord,
   updatePromptAgentMetadataById,
 } from "@/components/handlers/prompt-agent-metadata-handlers"
+import {
+  getCriteriaScoreConfig,
+  updateIndicatorScoreConfig,
+  type CriteriaScoreConfigRow,
+} from "@/components/handlers/criteria-score-config-handlers"
 import { getCriteriaByRole } from "@/components/handlers/role-criteria-handlers"
 import { createCriteriaNode } from "@/components/handlers/create-criteria-node-handlers"
 import { loadAllRoleScoringPrompts } from "@/components/handlers/load-all-role-scoring-prompts-handlers"
@@ -96,6 +101,11 @@ interface AgentMetadataFieldEditorProps {
   value: unknown
   path: Array<string | number>
   onPrimitiveChange: (path: Array<string | number>, nextRawValue: string) => void
+}
+
+interface EditableCriteriaScoreConfigRow extends CriteriaScoreConfigRow {
+  minScoreInput: string
+  maxScoreInput: string
 }
 
 function isEditableMetadataObject(value: unknown): value is Record<string, unknown> {
@@ -191,6 +201,12 @@ export default function PromptWorkspace({ organizations, defaultEnvironment = "p
   const [isLoadingAgentMetadata, setIsLoadingAgentMetadata] = useState(false)
   const [isSavingAgentMetadata, setIsSavingAgentMetadata] = useState(false)
   const [isAgentMetadataSaved, setIsAgentMetadataSaved] = useState(false)
+  const [isScoreConfigOpen, setIsScoreConfigOpen] = useState(false)
+  const [scoreConfigRows, setScoreConfigRows] = useState<EditableCriteriaScoreConfigRow[]>([])
+  const [scoreConfigError, setScoreConfigError] = useState<string | null>(null)
+  const [isLoadingScoreConfig, setIsLoadingScoreConfig] = useState(false)
+  const [isSavingScoreConfig, setIsSavingScoreConfig] = useState(false)
+  const [isScoreConfigSaved, setIsScoreConfigSaved] = useState(false)
   const [contextPromptState, setContextPromptState] = useState<{
     nodes: Node<ContextNodeData>[]
     edges: Edge[]
@@ -343,6 +359,9 @@ export default function PromptWorkspace({ organizations, defaultEnvironment = "p
     : isContextPrompt
       ? contextProductionPromptId
       : scoringProductionPromptByTab[activeTab] ?? null
+  const activeScoringCriteriaId = isCallPrompt || isContextPrompt
+    ? null
+    : scoringProductionCriteriaByTab[activeTab] ?? null
   const isProductionPromptOpen = Boolean(activeProductionPromptId)
 
   const getWorkspaceState = useCallback(() => {
@@ -578,6 +597,117 @@ export default function PromptWorkspace({ organizations, defaultEnvironment = "p
   const handleOpenContextRun = useCallback(() => {
     setIsContextRunOpen(true)
   }, [])
+
+  const handleLoadScoreConfig = useCallback(async (criteriaIdToLoad: string) => {
+    const criteriaId = criteriaIdToLoad.trim()
+    if (!criteriaId) {
+      setScoreConfigError("Select and load a scoring prompt before editing score config")
+      return
+    }
+
+    setIsLoadingScoreConfig(true)
+    setScoreConfigError(null)
+    setIsScoreConfigSaved(false)
+    try {
+      const rows = await getCriteriaScoreConfig(criteriaId)
+      setScoreConfigRows(
+        rows.map((row) => ({
+          ...row,
+          minScoreInput: String(row.minScore),
+          maxScoreInput: String(row.maxScore),
+        })),
+      )
+      if (rows.length === 0)
+        setScoreConfigError("No indicators found for this scoring prompt")
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to load score config"
+      setScoreConfigRows([])
+      setScoreConfigError(message)
+    } finally {
+      setIsLoadingScoreConfig(false)
+    }
+  }, [])
+
+  const handleOpenScoreConfig = useCallback(() => {
+    const criteriaId = activeScoringCriteriaId ?? ""
+    if (!criteriaId) {
+      setScoreConfigRows([])
+      setScoreConfigError("Select and load a scoring prompt before editing score config")
+      setIsScoreConfigOpen(true)
+      return
+    }
+
+    setIsScoreConfigOpen(true)
+    setScoreConfigRows([])
+    setScoreConfigError(null)
+    setIsScoreConfigSaved(false)
+    void handleLoadScoreConfig(criteriaId)
+  }, [activeScoringCriteriaId, handleLoadScoreConfig])
+
+  const handleScoreConfigFieldChange = useCallback((indicatorId: string, field: "minScoreInput" | "maxScoreInput", value: string) => {
+    setScoreConfigError(null)
+    setIsScoreConfigSaved(false)
+    setScoreConfigRows((previousRows) =>
+      previousRows.map((row) =>
+        row.indicatorId === indicatorId
+          ? {
+              ...row,
+              [field]: value,
+            }
+          : row,
+      ),
+    )
+  }, [])
+
+  const handleSaveScoreConfig = useCallback(async () => {
+    if (scoreConfigRows.length === 0) {
+      setScoreConfigError("No indicator score config to save")
+      return
+    }
+
+    setIsSavingScoreConfig(true)
+    setScoreConfigError(null)
+    setIsScoreConfigSaved(false)
+    try {
+      for (const row of scoreConfigRows) {
+        const minScore = Number(row.minScoreInput.trim())
+        if (!Number.isFinite(minScore)) {
+          setScoreConfigError(`Min score for ${row.indicatorName || row.indicatorId} must be a number`)
+          setIsSavingScoreConfig(false)
+          return
+        }
+
+        const maxScore = Number(row.maxScoreInput.trim())
+        if (!Number.isFinite(maxScore)) {
+          setScoreConfigError(`Max score for ${row.indicatorName || row.indicatorId} must be a number`)
+          setIsSavingScoreConfig(false)
+          return
+        }
+
+        if (minScore > maxScore) {
+          setScoreConfigError(`Min score for ${row.indicatorName || row.indicatorId} must be less than or equal to max score`)
+          setIsSavingScoreConfig(false)
+          return
+        }
+
+        await updateIndicatorScoreConfig(row.indicatorId, minScore, maxScore)
+      }
+
+      setScoreConfigRows((previousRows) =>
+        previousRows.map((row) => ({
+          ...row,
+          minScore: Number(row.minScoreInput.trim()),
+          maxScore: Number(row.maxScoreInput.trim()),
+        })),
+      )
+      setIsScoreConfigSaved(true)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to save score config"
+      setScoreConfigError(message)
+    } finally {
+      setIsSavingScoreConfig(false)
+    }
+  }, [scoreConfigRows])
 
   const handleRunContextPrompt = useCallback(async () => {
     const prompt = contextFlowCanvasRef.current?.getPrompt() ?? ""
@@ -995,15 +1125,27 @@ export default function PromptWorkspace({ organizations, defaultEnvironment = "p
               <Wand2 className="size-4" />
               Wizard
             </Button>
+            {(isCallPrompt || isContextPrompt) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleOpenAgentMetadata}
+                className="gap-2"
+                disabled={!activeProductionPromptId}
+              >
+                <Braces className="size-4" />
+                Agent metadata
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
-              onClick={handleOpenAgentMetadata}
+              onClick={handleOpenScoreConfig}
               className="gap-2"
-              disabled={!activeProductionPromptId}
+              disabled={!activeScoringCriteriaId}
             >
-              <Braces className="size-4" />
-              Agent metadata
+              <SlidersHorizontal className="size-4" />
+              Score Config
             </Button>
             <Button variant="outline" size="sm" onClick={handleImport} className="gap-2">
               <Upload className="size-4" />
@@ -1160,6 +1302,99 @@ export default function PromptWorkspace({ organizations, defaultEnvironment = "p
               >
                 {isSavingAgentMetadata && <Loader2 className="size-4 animate-spin" />}
                 {isSavingAgentMetadata ? "Saving..." : "Save metadata"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={isScoreConfigOpen}
+          onOpenChange={(open) => {
+            setIsScoreConfigOpen(open)
+            if (open)
+              return
+            setScoreConfigRows([])
+            setScoreConfigError(null)
+            setIsLoadingScoreConfig(false)
+            setIsSavingScoreConfig(false)
+            setIsScoreConfigSaved(false)
+          }}
+        >
+          <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-3xl">
+            <DialogHeader className="shrink-0">
+              <DialogTitle>Edit score config</DialogTitle>
+              <DialogDescription>
+                View and update `MinValidScore` and `MaxValidScore` for indicators on the selected scoring prompt.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="shrink-0 rounded-md border bg-muted/30 p-2 text-sm text-muted-foreground">
+              Criteria ID: {activeScoringCriteriaId ?? "Not selected"}
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto rounded-md border bg-muted/30 p-3">
+              {isLoadingScoreConfig ? (
+                <div className="flex h-full min-h-[220px] items-center justify-center">
+                  <Loader2 className="size-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : scoreConfigRows.length === 0 ? (
+                <div className="flex h-full min-h-[220px] items-center justify-center text-sm text-muted-foreground">
+                  Load a scoring prompt to view indicator score ranges.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {scoreConfigRows.map((row) => (
+                    <div key={row.indicatorId} className="space-y-2 rounded-md border bg-background p-3">
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-foreground">
+                          {row.indicatorName || `Indicator ${row.indicatorId}`}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Indicator ID: {row.indicatorId}</p>
+                      </div>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <div className="space-y-1">
+                          <label className="text-sm text-foreground">Min valid score</label>
+                          <Input
+                            type="number"
+                            value={row.minScoreInput}
+                            onChange={(event) => handleScoreConfigFieldChange(row.indicatorId, "minScoreInput", event.target.value)}
+                            disabled={isSavingScoreConfig}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-sm text-foreground">Max valid score</label>
+                          <Input
+                            type="number"
+                            value={row.maxScoreInput}
+                            onChange={(event) => handleScoreConfigFieldChange(row.indicatorId, "maxScoreInput", event.target.value)}
+                            disabled={isSavingScoreConfig}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {scoreConfigError && (
+              <p className="text-sm text-destructive">{scoreConfigError}</p>
+            )}
+            {isScoreConfigSaved && !scoreConfigError && (
+              <p className="text-sm text-foreground">Score config saved.</p>
+            )}
+            <DialogFooter className="shrink-0">
+              <Button
+                variant="outline"
+                onClick={() => setIsScoreConfigOpen(false)}
+                disabled={isSavingScoreConfig}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => void handleSaveScoreConfig()}
+                disabled={scoreConfigRows.length === 0 || isLoadingScoreConfig || isSavingScoreConfig}
+                className="gap-2"
+              >
+                {isSavingScoreConfig && <Loader2 className="size-4 animate-spin" />}
+                {isSavingScoreConfig ? "Saving..." : "Save score config"}
               </Button>
             </DialogFooter>
           </DialogContent>
